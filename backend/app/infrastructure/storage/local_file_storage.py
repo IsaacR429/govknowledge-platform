@@ -1,15 +1,13 @@
-﻿from pathlib import Path
-from shutil import copyfileobj
+﻿from hashlib import sha256
+from pathlib import Path
 from typing import BinaryIO
 from uuid import UUID
 
+from app.application.ports.file_storage import StoredFile
+
 
 class LocalFileStorage:
-    """Local P0 document storage.
-
-    The database stores relative paths rather than machine-specific
-    absolute paths.
-    """
+    """Local P0 storage with path safety and streaming SHA-256."""
 
     def __init__(
         self,
@@ -25,7 +23,14 @@ class LocalFileStorage:
     def _safe_filename(
         filename: str,
     ) -> str:
-        return Path(filename).name
+        safe_name = Path(filename).name
+
+        if not safe_name:
+            raise ValueError(
+                "Document filename cannot be empty."
+            )
+
+        return safe_name
 
     def store_document_version(
         self,
@@ -34,7 +39,7 @@ class LocalFileStorage:
         version_id: UUID,
         original_filename: str,
         source: BinaryIO,
-    ) -> Path:
+    ) -> StoredFile:
         safe_filename = self._safe_filename(
             original_filename
         )
@@ -59,13 +64,34 @@ class LocalFileStorage:
             exist_ok=True,
         )
 
-        with destination.open("wb") as output:
-            copyfileobj(
-                source,
-                output,
-            )
+        digest = sha256()
+        size_bytes = 0
 
-        return relative_path
+        try:
+            with destination.open("wb") as output:
+                while True:
+                    block = source.read(
+                        1024 * 1024
+                    )
+
+                    if not block:
+                        break
+
+                    output.write(block)
+                    digest.update(block)
+                    size_bytes += len(block)
+
+        except Exception:
+            destination.unlink(
+                missing_ok=True
+            )
+            raise
+
+        return StoredFile(
+            relative_path=relative_path,
+            sha256=digest.hexdigest(),
+            size_bytes=size_bytes,
+        )
 
     def resolve(
         self,
@@ -84,3 +110,13 @@ class LocalFileStorage:
             )
 
         return resolved
+
+    def delete(
+        self,
+        storage_path: str,
+    ) -> None:
+        path = self.resolve(storage_path)
+
+        path.unlink(
+            missing_ok=True
+        )

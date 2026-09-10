@@ -1,6 +1,14 @@
-﻿from pathlib import Path
+﻿from dataclasses import dataclass
+from pathlib import Path
 from typing import BinaryIO, Protocol
 from uuid import UUID
+
+
+@dataclass(frozen=True)
+class StoredFile:
+    relative_path: Path
+    sha256: str
+    size_bytes: int
 
 
 class FileStorage(Protocol):
@@ -11,11 +19,17 @@ class FileStorage(Protocol):
         version_id: UUID,
         original_filename: str,
         source: BinaryIO,
-    ) -> Path:
+    ) -> StoredFile:
         ...
 
     def resolve(
         self,
         storage_path: str,
     ) -> Path:
+        ...
+
+    def delete(
+        self,
+        storage_path: str,
+    ) -> None:
         ...
