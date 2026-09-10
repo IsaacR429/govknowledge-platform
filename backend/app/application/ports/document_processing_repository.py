@@ -1,4 +1,5 @@
-﻿from typing import Protocol
+﻿from dataclasses import dataclass
+from typing import Protocol
 from uuid import UUID
 
 from app.application.ports.document_parser import (
@@ -6,7 +7,21 @@ from app.application.ports.document_parser import (
 )
 
 
+@dataclass(frozen=True)
+class ProcessingJobAttempt:
+    processing_job_id: UUID
+    version_id: UUID
+    attempt_number: int
+
+
 class DocumentProcessingRepository(Protocol):
+    def create_retry_job(
+        self,
+        *,
+        version_id: UUID,
+    ) -> ProcessingJobAttempt:
+        ...
+
     def mark_processing(
         self,
         *,
