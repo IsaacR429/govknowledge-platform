@@ -9,13 +9,14 @@ class Settings(BaseSettings):
     app_name: str = "GovKnowledge API"
     app_version: str = "0.1.0"
     environment: str = "development"
-
     api_prefix: str = "/api/v1"
 
     database_url: str = (
         "postgresql+psycopg://govknowledge:govknowledge"
         "@localhost:5432/govknowledge"
     )
+
+    auth_session_ttl_minutes: int = 480
 
     model_config = SettingsConfigDict(
         env_file=".env",
