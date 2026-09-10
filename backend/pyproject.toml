@@ -17,13 +17,14 @@ dependencies = [
     "alembic",
     "pgvector",
     "python-multipart",
+    "pwdlib[argon2]",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "pytest-asyncio",
-    "httpx",
+    "httpx>=0.28.1,<1",
 ]
 
 [tool.pytest.ini_options]

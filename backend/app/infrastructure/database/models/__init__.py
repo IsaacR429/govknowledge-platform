@@ -1,4 +1,8 @@
-﻿from app.infrastructure.database.models.documents import (
+﻿from app.infrastructure.database.models.authentication import (
+    AuthSession,
+    LocalCredential,
+)
+from app.infrastructure.database.models.documents import (
     Document,
     DocumentChunk,
     DocumentPage,
@@ -14,11 +18,13 @@ from app.infrastructure.database.models.permissions import (
 )
 
 __all__ = [
+    "AuthSession",
     "Document",
     "DocumentChunk",
     "DocumentPage",
     "DocumentPermission",
     "DocumentVersion",
+    "LocalCredential",
     "Role",
     "User",
     "user_roles",
