@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     )
 
     auth_session_ttl_minutes: int = 480
+    document_storage_root: str = "data/documents"
 
     model_config = SettingsConfigDict(
         env_file=".env",
