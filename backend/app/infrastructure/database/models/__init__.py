@@ -1,3 +1,6 @@
+from app.infrastructure.database.models.embeddings import (
+    ChunkEmbedding,
+)
 from app.infrastructure.database.models.authentication import (
     AuthSession,
     LocalCredential,
@@ -21,6 +24,7 @@ from app.infrastructure.database.models.processing import (
 )
 
 __all__ = [
+    "ChunkEmbedding",
     "AuthSession",
     "Document",
     "DocumentChunk",
