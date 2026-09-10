@@ -18,6 +18,7 @@ dependencies = [
     "pgvector",
     "python-multipart",
     "pwdlib[argon2]",
+    "docling==2.65.0",
 ]
 
 [project.optional-dependencies]
