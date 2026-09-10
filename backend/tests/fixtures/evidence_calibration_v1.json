@@ -1,0 +1,82 @@
+[
+  {
+    "id": "A01",
+    "label": "ANSWERABLE",
+    "question": "Quelle est la responsabilité principale du Conseil de sécurité ?"
+  },
+  {
+    "id": "A02",
+    "label": "ANSWERABLE",
+    "question": "Quels sont les principaux buts des Nations Unies ?"
+  },
+  {
+    "id": "A03",
+    "label": "ANSWERABLE",
+    "question": "Comment un nouvel État peut-il devenir membre des Nations Unies ?"
+  },
+  {
+    "id": "A04",
+    "label": "ANSWERABLE",
+    "question": "Comment les décisions de l'Assemblée générale sont-elles prises ?"
+  },
+  {
+    "id": "A05",
+    "label": "ANSWERABLE",
+    "question": "Comment le Secrétaire général est-il nommé ?"
+  },
+  {
+    "id": "A06",
+    "label": "ANSWERABLE",
+    "question": "Dans quelles conditions un membre peut-il être expulsé de l'ONU ?"
+  },
+  {
+    "id": "A07",
+    "label": "ANSWERABLE",
+    "question": "La Charte reconnaît-elle un droit de légitime défense ?"
+  },
+  {
+    "id": "A08",
+    "label": "ANSWERABLE",
+    "question": "Quel est le rôle de la Cour internationale de Justice ?"
+  },
+  {
+    "id": "U01",
+    "label": "UNANSWERABLE",
+    "question": "Quel est le seuil financier applicable aux marchés publics ?"
+  },
+  {
+    "id": "U02",
+    "label": "UNANSWERABLE",
+    "question": "Combien de jours de congé annuel un fonctionnaire a-t-il droit ?"
+  },
+  {
+    "id": "U03",
+    "label": "UNANSWERABLE",
+    "question": "Quel est le taux de TVA applicable aux entreprises ?"
+  },
+  {
+    "id": "U04",
+    "label": "UNANSWERABLE",
+    "question": "Pendant combien de temps les journaux de cybersécurité doivent-ils être conservés ?"
+  },
+  {
+    "id": "U05",
+    "label": "UNANSWERABLE",
+    "question": "Quels sont les frais de délivrance d'un passeport ?"
+  },
+  {
+    "id": "U06",
+    "label": "UNANSWERABLE",
+    "question": "Quel est l'âge légal de départ à la retraite ?"
+  },
+  {
+    "id": "U07",
+    "label": "UNANSWERABLE",
+    "question": "Quelle autorité approuve les achats informatiques d'un ministère ?"
+  },
+  {
+    "id": "U08",
+    "label": "UNANSWERABLE",
+    "question": "Les données personnelles doivent-elles être hébergées dans le pays ?"
+  }
+]
