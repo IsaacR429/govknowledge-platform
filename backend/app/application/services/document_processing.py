@@ -18,6 +18,9 @@ from app.application.services.audit import (
     AuditPersistenceError,
     AuditService,
 )
+from app.application.services.parsed_document_validation import (
+    validate_parsed_document,
+)
 from app.domain.enums.audit import (
     AuditEventType,
     AuditOutcome,
@@ -126,10 +129,12 @@ class DocumentProcessingService:
                 language=target.language,
             )
 
-            if not parsed.pages:
-                raise ValueError(
-                    "Parsed document contains no pages."
-                )
+            validate_parsed_document(
+                parsed,
+                expected_language=(
+                    target.language
+                ),
+            )
 
             self._repository.complete_processing(
                 document_id=target.document_id,

@@ -362,7 +362,7 @@ def test_successful_processing_cannot_be_rerun(
         db.close()
 
 
-def test_failed_persistence_rolls_back_pages_and_chunks(
+def test_invalid_parsed_document_persists_no_pages_or_chunks(
     tmp_path,
 ):
     db = SessionLocal()
@@ -409,7 +409,7 @@ def test_failed_persistence_rolls_back_pages_and_chunks(
         with pytest.raises(
             ValueError,
             match=(
-                "Chunk references a page"
+                "Chunk references an unknown page"
             ),
         ):
             service.process(request)
@@ -441,6 +441,11 @@ def test_failed_persistence_rolls_back_pages_and_chunks(
             == "DOCUMENT_PROCESSING_FAILED"
         )
 
+        assert (
+            job.error_message
+            == "Document processing failed."
+        )
+
         page_count = db.scalar(
             select(
                 func.count(
@@ -463,9 +468,8 @@ def test_failed_persistence_rolls_back_pages_and_chunks(
             )
         )
 
-        # The page was flushed before the
-        # invalid chunk was discovered.
-        # Rollback must still remove it.
+        # Validation occurs before canonical
+        # pages or chunks are persisted.
         assert page_count == 0
         assert chunk_count == 0
 
@@ -544,7 +548,7 @@ def test_failed_document_can_succeed_on_second_attempt(
 
         with pytest.raises(
             ValueError,
-            match="Chunk references a page",
+            match="Chunk references an unknown page",
         ):
             failing_service.process(
                 attempt_one_request
