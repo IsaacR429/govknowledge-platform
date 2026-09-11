@@ -1,4 +1,5 @@
-﻿from pathlib import Path
+﻿from importlib.metadata import version
+from pathlib import Path
 
 from app.infrastructure.parsing.docling_parser import (
     DoclingDocumentParser,
@@ -109,6 +110,28 @@ def test_docling_parser_preserves_page_provenance(
         chunk.metadata["parser"]
         == "docling"
         for chunk in parsed.chunks
+    )
+
+
+    metadata = parsed.pages[0].metadata
+
+    assert (
+        metadata["docling_version"]
+        == version("docling")
+    )
+    assert (
+        metadata["docling_core_version"]
+        == version("docling-core")
+    )
+    assert (
+        metadata[
+            "docling_ibm_models_version"
+        ]
+        == version("docling-ibm-models")
+    )
+    assert (
+        metadata["docling_parse_version"]
+        == version("docling-parse")
     )
 
 

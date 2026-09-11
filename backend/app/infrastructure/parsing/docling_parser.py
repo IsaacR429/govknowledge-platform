@@ -1,13 +1,26 @@
-﻿from importlib.metadata import version
+from importlib.metadata import version
 from pathlib import Path
 
-from docling.document_converter import DocumentConverter
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import (
+    PdfPipelineOptions,
+    RapidOcrOptions,
+)
+from docling.document_converter import (
+    DocumentConverter,
+    PdfFormatOption,
+)
 
 from app.application.ports.document_parser import (
     DocumentParser,
     ParsedChunk,
     ParsedDocument,
     ParsedPage,
+)
+from app.infrastructure.parsing.docling_artifacts import (
+    OCR_BACKEND,
+    P0_MAX_CHUNK_CHARS,
+    load_docling_artifact_bundle,
 )
 
 
@@ -27,18 +40,78 @@ class DoclingDocumentParser(DocumentParser):
         self,
         *,
         converter: DocumentConverter | None = None,
-        max_chunk_chars: int = 3000,
+        artifacts_path: Path | None = None,
+        max_chunk_chars: int = P0_MAX_CHUNK_CHARS,
     ) -> None:
         if max_chunk_chars < 1:
             raise ValueError(
                 "max_chunk_chars must be greater than zero."
             )
 
-        self._converter = (
-            converter
-            if converter is not None
-            else DocumentConverter()
-        )
+        self._artifact_bundle_id: str | None = None
+        self._artifact_bundle_revision: str | None = None
+        self._ocr_model_family: str | None = None
+        self._chunking_strategy: str | None = None
+
+        if converter is not None:
+            self._converter = converter
+        else:
+            bundle = load_docling_artifact_bundle(
+                artifacts_path
+            )
+
+            if (
+                max_chunk_chars
+                != bundle.max_chunk_chars
+            ):
+                raise ValueError(
+                    "Production Docling parser "
+                    "chunk size must match the "
+                    "frozen P0 bundle."
+                )
+
+            pipeline_options = PdfPipelineOptions(
+                artifacts_path=bundle.root,
+                do_ocr=True,
+                ocr_options=RapidOcrOptions(
+                    backend=OCR_BACKEND,
+                    det_model_path=str(
+                        bundle.ocr_det_model_path
+                    ),
+                    cls_model_path=str(
+                        bundle.ocr_cls_model_path
+                    ),
+                    rec_model_path=str(
+                        bundle.ocr_rec_model_path
+                    ),
+                    rapidocr_params={
+                        "Rec.rec_keys_path": None,
+                    },
+                ),
+            )
+
+            self._converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(
+                        pipeline_options=(
+                            pipeline_options
+                        ),
+                    )
+                }
+            )
+
+            self._artifact_bundle_id = (
+                bundle.bundle_id
+            )
+            self._artifact_bundle_revision = (
+                bundle.bundle_revision
+            )
+            self._ocr_model_family = (
+                bundle.ocr_model_family
+            )
+            self._chunking_strategy = (
+                bundle.chunking_strategy
+            )
 
         self._max_chunk_chars = max_chunk_chars
 
@@ -48,6 +121,22 @@ class DoclingDocumentParser(DocumentParser):
 
         self._docling_core_version = version(
             "docling-core"
+        )
+
+        self._docling_ibm_models_version = version(
+            "docling-ibm-models"
+        )
+
+        self._docling_parse_version = version(
+            "docling-parse"
+        )
+
+        self._rapidocr_version = version(
+            "rapidocr"
+        )
+
+        self._onnxruntime_version = version(
+            "onnxruntime"
         )
 
     def parse(
@@ -97,8 +186,45 @@ class DoclingDocumentParser(DocumentParser):
                 "docling_core_version": (
                     self._docling_core_version
                 ),
+                "docling_ibm_models_version": (
+                    self._docling_ibm_models_version
+                ),
+                "docling_parse_version": (
+                    self._docling_parse_version
+                ),
+                "rapidocr_version": (
+                    self._rapidocr_version
+                ),
+                "onnxruntime_version": (
+                    self._onnxruntime_version
+                ),
+                "max_chunk_chars": (
+                    self._max_chunk_chars
+                ),
                 "page_number": page_number,
             }
+
+            if (
+                self._artifact_bundle_id
+                is not None
+            ):
+                parser_metadata[
+                    "artifact_bundle_id"
+                ] = self._artifact_bundle_id
+
+                parser_metadata[
+                    "artifact_bundle_revision"
+                ] = (
+                    self._artifact_bundle_revision
+                )
+
+                parser_metadata[
+                    "ocr_model_family"
+                ] = self._ocr_model_family
+
+                parser_metadata[
+                    "chunking_strategy"
+                ] = self._chunking_strategy
 
             pages.append(
                 ParsedPage(
