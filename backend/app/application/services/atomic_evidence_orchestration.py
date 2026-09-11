@@ -2,12 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Sequence
+from uuid import UUID, uuid4
 
+from app.application.ports.audit import (
+    AuditEvent,
+)
 from app.application.ports.identity_provider import (
     CurrentIdentity,
 )
 from app.application.ports.retrieval import (
     RetrievedChunk,
+)
+from app.application.services.audit import (
+    AuditService,
 )
 from app.application.services.atomic_evidence_policy import (
     AtomicClaimEvidence,
@@ -20,6 +27,10 @@ from app.application.services.authorized_search import (
 from app.application.services.sentence_evidence_verification import (
     EvidenceVerificationResult,
     SentenceEvidenceVerificationService,
+)
+from app.domain.enums.audit import (
+    AuditEventType,
+    AuditOutcome,
 )
 
 
@@ -53,6 +64,7 @@ class AtomicClaimResult:
 
 @dataclass(frozen=True)
 class AtomicEvidenceOrchestrationResult:
+    correlation_id: UUID
     claim_results: tuple[
         AtomicClaimResult,
         ...,
@@ -86,6 +98,7 @@ class AtomicEvidenceOrchestrationService:
             SentenceEvidenceVerificationService
         ),
         policy: AtomicEvidencePolicy,
+        audit: AuditService,
         top_k: int = 5,
     ) -> None:
         if top_k < 1:
@@ -96,6 +109,7 @@ class AtomicEvidenceOrchestrationService:
         self._search = search
         self._verification = verification
         self._policy = policy
+        self._audit = audit
         self._top_k = top_k
 
     def evaluate(
@@ -103,6 +117,7 @@ class AtomicEvidenceOrchestrationService:
         *,
         identity: CurrentIdentity,
         claims: Sequence[AtomicClaim],
+        correlation_id: UUID | None = None,
     ) -> AtomicEvidenceOrchestrationResult:
         items = tuple(claims)
 
@@ -118,6 +133,44 @@ class AtomicEvidenceOrchestrationService:
                 "claim_id values must be unique."
             )
 
+        operation_id = (
+            correlation_id
+            if correlation_id is not None
+            else uuid4()
+        )
+
+        required_claim_count = sum(
+            1
+            for item in items
+            if item.required
+        )
+
+        # Deliberately contains counts only.
+        # Raw query/claim text must never enter
+        # the audit store.
+        self._audit.record(
+            AuditEvent(
+                event_type=(
+                    AuditEventType
+                    .QUERY_SUBMITTED
+                ),
+                outcome=(
+                    AuditOutcome.SUCCEEDED
+                ),
+                actor_user_id=(
+                    identity.user_id
+                ),
+                resource_type="qa_evidence",
+                correlation_id=operation_id,
+                metadata={
+                    "claim_count": len(items),
+                    "required_claim_count": (
+                        required_claim_count
+                    ),
+                },
+            )
+        )
+
         claim_results: list[
             AtomicClaimResult
         ] = []
@@ -131,8 +184,7 @@ class AtomicEvidenceOrchestrationService:
                 claim.text.strip()
             )
 
-            # Security boundary:
-            # authorization happens inside
+            # Authorization happens inside
             # AuthorizedSearchService BEFORE
             # embedding-backed retrieval.
             search_result = (
@@ -143,8 +195,8 @@ class AtomicEvidenceOrchestrationService:
                 )
             )
 
-            # Only the already-authorized
-            # retrieval result can enter NLI.
+            # Only authorized retrieval results
+            # may enter NLI.
             verification = (
                 self._verification.verify(
                     claim=claim_text,
@@ -160,37 +212,75 @@ class AtomicEvidenceOrchestrationService:
                     retrieved_evidence=(
                         search_result.results
                     ),
-                    verification=(
-                        verification
-                    ),
+                    verification=verification,
                 )
             )
 
             policy_inputs.append(
                 AtomicClaimEvidence(
-                    claim_id=(
-                        claim.claim_id
-                    ),
-                    verification=(
-                        verification
-                    ),
-                    required=(
-                        claim.required
-                    ),
+                    claim_id=claim.claim_id,
+                    verification=verification,
+                    required=claim.required,
                 )
             )
 
-        assessment = (
-            self._policy.assess(
-                policy_inputs
+        assessment = self._policy.assess(
+            policy_inputs
+        )
+
+        total_retrieved = sum(
+            len(
+                item.retrieved_evidence
+            )
+            for item in claim_results
+        )
+
+        event_type = (
+            AuditEventType.EVIDENCE_SUFFICIENT
+            if assessment.is_sufficient
+            else AuditEventType
+            .EVIDENCE_INSUFFICIENT
+        )
+
+        # Evaluation itself completed normally.
+        # Sufficiency is represented by event_type,
+        # not by treating a refusal as a system error.
+        self._audit.record(
+            AuditEvent(
+                event_type=event_type,
+                outcome=(
+                    AuditOutcome.SUCCEEDED
+                ),
+                actor_user_id=(
+                    identity.user_id
+                ),
+                resource_type="qa_evidence",
+                correlation_id=operation_id,
+                metadata={
+                    "claim_count": len(items),
+                    "required_claim_count": (
+                        required_claim_count
+                    ),
+                    "retrieved_result_count": (
+                        total_retrieved
+                    ),
+                    "unsupported_required_claim_count": (
+                        len(
+                            assessment
+                            .unsupported_required_claim_ids
+                        )
+                    ),
+                    "decision": (
+                        assessment.decision.value
+                    ),
+                },
             )
         )
 
-        return (
-            AtomicEvidenceOrchestrationResult(
-                claim_results=tuple(
-                    claim_results
-                ),
-                assessment=assessment,
-            )
+        return AtomicEvidenceOrchestrationResult(
+            correlation_id=operation_id,
+            claim_results=tuple(
+                claim_results
+            ),
+            assessment=assessment,
         )

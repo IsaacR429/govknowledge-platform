@@ -1,3 +1,6 @@
+from app.infrastructure.database.models.audit import (
+    AuditEventRecord,
+)
 from app.infrastructure.database.models.embeddings import (
     ChunkEmbedding,
 )
@@ -24,6 +27,7 @@ from app.infrastructure.database.models.processing import (
 )
 
 __all__ = [
+    "AuditEventRecord",
     "ChunkEmbedding",
     "AuthSession",
     "Document",

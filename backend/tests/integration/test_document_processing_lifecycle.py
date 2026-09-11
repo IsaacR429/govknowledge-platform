@@ -44,6 +44,18 @@ from app.infrastructure.storage.local_file_storage import (
 )
 
 
+class RecordingAuditService:
+    def __init__(self):
+        self.calls = []
+
+    def record(
+        self,
+        event,
+    ):
+        self.calls.append(event)
+        return uuid4()
+
+
 class CountingParser:
     def __init__(
         self,
@@ -263,18 +275,13 @@ def test_successful_processing_cannot_be_rerun(
             ),
             storage=storage,
             parser=parser,
+            audit=RecordingAuditService(),
         )
 
         request = ProcessDocumentRequest(
-            document_id=created.document_id,
-            version_id=created.version_id,
             processing_job_id=(
                 created.processing_job_id
             ),
-            storage_path=(
-                storage_path
-            ),
-            language="en",
         )
 
         service.process(request)
@@ -390,18 +397,13 @@ def test_failed_persistence_rolls_back_pages_and_chunks(
             parser=CountingParser(
                 invalid_parsed_document()
             ),
+            audit=RecordingAuditService(),
         )
 
         request = ProcessDocumentRequest(
-            document_id=created.document_id,
-            version_id=created.version_id,
             processing_job_id=(
                 created.processing_job_id
             ),
-            storage_path=(
-                storage_path
-            ),
-            language="en",
         )
 
         with pytest.raises(
@@ -528,22 +530,15 @@ def test_failed_document_can_succeed_on_second_attempt(
                 parser=CountingParser(
                     invalid_parsed_document()
                 ),
+                audit=RecordingAuditService(),
             )
         )
 
         attempt_one_request = (
             ProcessDocumentRequest(
-                document_id=(
-                    created.document_id
-                ),
-                version_id=(
-                    created.version_id
-                ),
                 processing_job_id=(
                     created.processing_job_id
                 ),
-                storage_path=storage_path,
-                language="en",
             )
         )
 
@@ -635,22 +630,15 @@ def test_failed_document_can_succeed_on_second_attempt(
                 repository=repository,
                 storage=storage,
                 parser=successful_parser,
+                audit=RecordingAuditService(),
             )
         )
 
         result = successful_service.process(
             ProcessDocumentRequest(
-                document_id=(
-                    created.document_id
-                ),
-                version_id=(
-                    created.version_id
-                ),
                 processing_job_id=(
                     retry.processing_job_id
                 ),
-                storage_path=storage_path,
-                language="en",
             )
         )
 
@@ -745,6 +733,113 @@ def test_failed_document_can_succeed_on_second_attempt(
             retry_service.create_retry(
                 version_id=created.version_id
             )
+
+    finally:
+        if created is not None:
+            cleanup_document(
+                db,
+                document_id=(
+                    created.document_id
+                ),
+                version_id=(
+                    created.version_id
+                ),
+            )
+
+        db.close()
+
+
+
+def test_processing_target_is_derived_from_database(
+    tmp_path,
+):
+    db = SessionLocal()
+
+    storage = LocalFileStorage(
+        tmp_path / "documents"
+    )
+
+    created = None
+
+    try:
+        created = ingest_document(
+            db,
+            storage,
+        )
+
+        version = db.get(
+            DocumentVersion,
+            created.version_id,
+        )
+
+        document = db.get(
+            Document,
+            created.document_id,
+        )
+
+        assert version is not None
+        assert document is not None
+
+        repository = (
+            PostgresDocumentProcessingRepository(
+                db
+            )
+        )
+
+        target = repository.mark_processing(
+            processing_job_id=(
+                created.processing_job_id
+            )
+        )
+
+        assert (
+            target.processing_job_id
+            == created.processing_job_id
+        )
+
+        assert (
+            target.version_id
+            == version.id
+        )
+
+        assert (
+            target.document_id
+            == document.id
+        )
+
+        assert (
+            target.storage_path
+            == version.storage_path
+        )
+
+        assert (
+            target.language
+            == document.language
+        )
+
+        # The repository, not the caller,
+        # performed the lifecycle transition.
+        db.expire_all()
+
+        persisted_version = db.get(
+            DocumentVersion,
+            created.version_id,
+        )
+
+        persisted_job = db.get(
+            DocumentProcessingJob,
+            created.processing_job_id,
+        )
+
+        assert (
+            persisted_version.processing_status
+            == ProcessingStatus.PROCESSING.value
+        )
+
+        assert (
+            persisted_job.status
+            == ProcessingStatus.PROCESSING.value
+        )
 
     finally:
         if created is not None:

@@ -10,9 +10,11 @@ from app.application.ports.document_parser import (
 from app.application.ports.document_processing_repository import (
     DocumentProcessingRepository,
     ProcessingJobAttempt,
+    ProcessingTarget,
 )
 from app.domain.enums.processing import ProcessingStatus
 from app.infrastructure.database.models.documents import (
+    Document,
     DocumentChunk,
     DocumentPage,
     DocumentVersion,
@@ -171,13 +173,51 @@ class PostgresDocumentProcessingRepository(
     def mark_processing(
         self,
         *,
-        version_id: UUID,
         processing_job_id: UUID,
-    ) -> None:
-        version, job = self._load(
-            version_id=version_id,
-            processing_job_id=processing_job_id,
+    ) -> ProcessingTarget:
+        # Lock the job so two workers cannot
+        # start the same PENDING attempt.
+        job = self._db.scalar(
+            select(
+                DocumentProcessingJob
+            )
+            .where(
+                DocumentProcessingJob.id
+                == processing_job_id
+            )
+            .with_for_update()
         )
+
+        if job is None:
+            raise ValueError(
+                "Processing job does not exist."
+            )
+
+        version = self._db.scalar(
+            select(
+                DocumentVersion
+            )
+            .where(
+                DocumentVersion.id
+                == job.document_version_id
+            )
+            .with_for_update()
+        )
+
+        if version is None:
+            raise ValueError(
+                "Document version does not exist."
+            )
+
+        document = self._db.get(
+            Document,
+            version.document_id,
+        )
+
+        if document is None:
+            raise ValueError(
+                "Document does not exist."
+            )
 
         if (
             job.status
@@ -203,6 +243,17 @@ class PostgresDocumentProcessingRepository(
                 f"{version.processing_status}."
             )
 
+        # Capture the authoritative target before
+        # commit. Nothing below is supplied by
+        # the processing caller.
+        target = ProcessingTarget(
+            processing_job_id=job.id,
+            version_id=version.id,
+            document_id=version.document_id,
+            storage_path=version.storage_path,
+            language=document.language,
+        )
+
         now = datetime.now(
             timezone.utc
         )
@@ -220,7 +271,13 @@ class PostgresDocumentProcessingRepository(
         job.error_code = None
         job.error_message = None
 
-        self._db.commit()
+        try:
+            self._db.commit()
+        except Exception:
+            self._db.rollback()
+            raise
+
+        return target
 
     def complete_processing(
         self,

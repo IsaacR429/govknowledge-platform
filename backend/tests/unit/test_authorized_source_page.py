@@ -5,11 +5,21 @@ from uuid import uuid4
 
 import pytest
 
+from app.application.ports.identity_provider import (
+    CurrentIdentity,
+)
 from app.application.ports.source_page_repository import (
     SourcePage,
 )
+from app.application.services.audit import (
+    AuditPersistenceError,
+)
 from app.application.services.authorized_source_page import (
     AuthorizedSourcePageService,
+)
+from app.domain.enums.audit import (
+    AuditEventType,
+    AuditOutcome,
 )
 from app.domain.exceptions.authorization import (
     AuthorizationDeniedError,
@@ -31,9 +41,7 @@ class FakeSourcePageRepository:
         self,
         page_id,
     ):
-        self.calls.append(
-            page_id
-        )
+        self.calls.append(page_id)
 
         if (
             self.page is not None
@@ -72,6 +80,41 @@ class FakeAuthorizationService:
             )
 
 
+class FakeAuditService:
+    def __init__(
+        self,
+        *,
+        fail=False,
+    ):
+        self.fail = fail
+        self.calls = []
+
+    def record(
+        self,
+        event,
+    ):
+        self.calls.append(event)
+
+        if self.fail:
+            raise AuditPersistenceError(
+                "Audit unavailable."
+            )
+
+        return uuid4()
+
+
+def current_identity():
+    return CurrentIdentity(
+        user_id=uuid4(),
+        username="employee",
+        display_name="Employee",
+        email=None,
+        department="Finance",
+        language_preference="fr",
+        roles=("EMPLOYEE",),
+    )
+
+
 def source_page():
     return SourcePage(
         page_id=uuid4(),
@@ -108,30 +151,27 @@ def source_page():
     )
 
 
-def test_returns_page_after_authorization():
+def test_returns_page_after_authorization_and_audit():
     page = source_page()
 
-    repository = (
-        FakeSourcePageRepository(
-            page
-        )
+    repository = FakeSourcePageRepository(
+        page
     )
 
     authorization = (
         FakeAuthorizationService()
     )
 
-    identity = object()
+    audit = FakeAuditService()
+    identity = current_identity()
 
-    result = (
-        AuthorizedSourcePageService(
-            repository=repository,
-            authorization=authorization,
-        )
-        .get(
-            identity=identity,
-            page_id=page.page_id,
-        )
+    result = AuthorizedSourcePageService(
+        repository=repository,
+        authorization=authorization,
+        audit=audit,
+    ).get(
+        identity=identity,
+        page_id=page.page_id,
     )
 
     assert result == page
@@ -147,8 +187,32 @@ def test_returns_page_after_authorization():
         )
     ]
 
+    assert len(audit.calls) == 1
 
-def test_missing_page_does_not_call_authorization():
+    event = audit.calls[0]
+
+    assert (
+        event.event_type
+        == AuditEventType.SOURCE_PAGE_VIEWED
+    )
+    assert (
+        event.outcome
+        == AuditOutcome.SUCCEEDED
+    )
+    assert (
+        event.actor_user_id
+        == identity.user_id
+    )
+    assert event.resource_type == "source_page"
+    assert event.resource_id == page.page_id
+    assert event.document_id == page.document_id
+    assert event.error_code is None
+    assert event.metadata == {
+        "permission": "READ",
+    }
+
+
+def test_missing_page_does_not_authorize_or_audit():
     repository = (
         FakeSourcePageRepository()
     )
@@ -157,26 +221,27 @@ def test_missing_page_does_not_call_authorization():
         FakeAuthorizationService()
     )
 
+    audit = FakeAuditService()
+
     page_id = uuid4()
 
     with pytest.raises(
         SourcePageNotFoundError
     ):
-        (
-            AuthorizedSourcePageService(
-                repository=repository,
-                authorization=authorization,
-            )
-            .get(
-                identity=object(),
-                page_id=page_id,
-            )
+        AuthorizedSourcePageService(
+            repository=repository,
+            authorization=authorization,
+            audit=audit,
+        ).get(
+            identity=current_identity(),
+            page_id=page_id,
         )
 
     assert authorization.calls == []
+    assert audit.calls == []
 
 
-def test_unauthorized_page_is_not_returned():
+def test_unauthorized_page_is_audited_and_not_returned():
     page = source_page()
 
     repository = (
@@ -191,19 +256,98 @@ def test_unauthorized_page_is_not_returned():
         )
     )
 
+    audit = FakeAuditService()
+    identity = current_identity()
+
     with pytest.raises(
         AuthorizationDeniedError
     ):
-        (
-            AuthorizedSourcePageService(
-                repository=repository,
-                authorization=authorization,
-            )
-            .get(
-                identity=object(),
-                page_id=page.page_id,
-            )
+        AuthorizedSourcePageService(
+            repository=repository,
+            authorization=authorization,
+            audit=audit,
+        ).get(
+            identity=identity,
+            page_id=page.page_id,
         )
+
+    assert len(audit.calls) == 1
+
+    event = audit.calls[0]
+
+    assert (
+        event.event_type
+        == AuditEventType.SOURCE_PAGE_DENIED
+    )
+    assert event.outcome == AuditOutcome.DENIED
+    assert (
+        event.actor_user_id
+        == identity.user_id
+    )
+    assert event.resource_id == page.page_id
+    assert event.document_id == page.document_id
+    assert (
+        event.error_code
+        == "DOCUMENT_READ_DENIED"
+    )
+
+
+def test_authorized_page_fails_closed_when_audit_fails():
+    page = source_page()
+
+    audit = FakeAuditService(
+        fail=True
+    )
+
+    with pytest.raises(
+        AuditPersistenceError
+    ):
+        AuthorizedSourcePageService(
+            repository=(
+                FakeSourcePageRepository(
+                    page
+                )
+            ),
+            authorization=(
+                FakeAuthorizationService()
+            ),
+            audit=audit,
+        ).get(
+            identity=current_identity(),
+            page_id=page.page_id,
+        )
+
+    assert len(audit.calls) == 1
+
+
+def test_denied_page_preserves_denial_when_audit_fails():
+    page = source_page()
+
+    audit = FakeAuditService(
+        fail=True
+    )
+
+    with pytest.raises(
+        AuthorizationDeniedError
+    ):
+        AuthorizedSourcePageService(
+            repository=(
+                FakeSourcePageRepository(
+                    page
+                )
+            ),
+            authorization=(
+                FakeAuthorizationService(
+                    denied=True
+                )
+            ),
+            audit=audit,
+        ).get(
+            identity=current_identity(),
+            page_id=page.page_id,
+        )
+
+    assert len(audit.calls) == 1
 
 
 def test_source_page_contains_no_storage_path():

@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
@@ -14,6 +14,15 @@ class ProcessingJobAttempt:
     attempt_number: int
 
 
+@dataclass(frozen=True)
+class ProcessingTarget:
+    processing_job_id: UUID
+    version_id: UUID
+    document_id: UUID
+    storage_path: str
+    language: str
+
+
 class DocumentProcessingRepository(Protocol):
     def create_retry_job(
         self,
@@ -25,9 +34,8 @@ class DocumentProcessingRepository(Protocol):
     def mark_processing(
         self,
         *,
-        version_id: UUID,
         processing_job_id: UUID,
-    ) -> None:
+    ) -> ProcessingTarget:
         ...
 
     def complete_processing(

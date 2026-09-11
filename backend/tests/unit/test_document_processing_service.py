@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -8,9 +8,19 @@ from app.application.ports.document_parser import (
     ParsedDocument,
     ParsedPage,
 )
+from app.application.ports.document_processing_repository import (
+    ProcessingTarget,
+)
+from app.application.services.audit import (
+    AuditPersistenceError,
+)
 from app.application.services.document_processing import (
     DocumentProcessingService,
     ProcessDocumentRequest,
+)
+from app.domain.enums.audit import (
+    AuditEventType,
+    AuditOutcome,
 )
 
 
@@ -18,7 +28,10 @@ class FakeStorage:
     def __init__(self, path: Path):
         self.path = path
 
-    def resolve(self, storage_path: str) -> Path:
+    def resolve(
+        self,
+        storage_path: str,
+    ) -> Path:
         assert storage_path == "document.pdf"
         return self.path
 
@@ -77,18 +90,31 @@ class FailingParser:
 
 
 class RecordingRepository:
-    def __init__(self):
+    def __init__(
+        self,
+        target,
+    ):
+        self.target = target
         self.calls = []
 
     def mark_processing(
         self,
         *,
-        version_id,
         processing_job_id,
     ):
         self.calls.append(
-            ("processing", version_id, processing_job_id)
+            (
+                "processing",
+                processing_job_id,
+            )
         )
+
+        assert (
+            processing_job_id
+            == self.target.processing_job_id
+        )
+
+        return self.target
 
     def complete_processing(
         self,
@@ -128,13 +154,70 @@ class RecordingRepository:
         )
 
 
+class FakeAuditService:
+    def __init__(
+        self,
+        *,
+        fail_on_event=None,
+    ):
+        self.calls = []
+        self.fail_on_event = (
+            fail_on_event
+        )
+
+    def record(
+        self,
+        event,
+    ):
+        self.calls.append(event)
+
+        if (
+            event.event_type
+            == self.fail_on_event
+        ):
+            raise AuditPersistenceError(
+                "Audit unavailable."
+            )
+
+        return uuid4()
+
+
 def make_request():
     return ProcessDocumentRequest(
-        document_id=uuid4(),
-        version_id=uuid4(),
         processing_job_id=uuid4(),
+    )
+
+
+def make_target(
+    request,
+):
+    return ProcessingTarget(
+        processing_job_id=(
+            request.processing_job_id
+        ),
+        version_id=uuid4(),
+        document_id=uuid4(),
         storage_path="document.pdf",
         language="fr",
+    )
+
+
+def service(
+    *,
+    repository,
+    storage,
+    parser,
+    audit=None,
+):
+    return DocumentProcessingService(
+        repository=repository,
+        storage=storage,
+        parser=parser,
+        audit=(
+            audit
+            if audit is not None
+            else FakeAuditService()
+        ),
     )
 
 
@@ -144,16 +227,20 @@ def test_processing_service_completes_document(
     file_path = tmp_path / "document.pdf"
     file_path.write_bytes(b"test")
 
-    repository = RecordingRepository()
+    request = make_request()
+    target = make_target(request)
+    repository = RecordingRepository(
+        target
+    )
+    audit = FakeAuditService()
 
-    service = DocumentProcessingService(
+    result = service(
         repository=repository,
         storage=FakeStorage(file_path),
         parser=SuccessfulParser(),
-    )
-
-    result = service.process(
-        make_request()
+        audit=audit,
+    ).process(
+        request
     )
 
     assert result.page_count == 2
@@ -167,6 +254,52 @@ def test_processing_service_completes_document(
         "complete",
     ]
 
+    assert [
+        event.event_type
+        for event in audit.calls
+    ] == [
+        AuditEventType
+        .DOCUMENT_PROCESSING_STARTED,
+        AuditEventType
+        .DOCUMENT_PROCESSING_COMPLETED,
+    ]
+
+    started, completed = audit.calls
+
+    assert (
+        started.outcome
+        == AuditOutcome.SUCCEEDED
+    )
+    assert (
+        completed.outcome
+        == AuditOutcome.SUCCEEDED
+    )
+
+    assert (
+        started.correlation_id
+        == request.processing_job_id
+    )
+    assert (
+        completed.correlation_id
+        == request.processing_job_id
+    )
+
+    assert started.actor_user_id is None
+
+    assert (
+        completed.metadata[
+            "page_count"
+        ]
+        == 2
+    )
+
+    assert (
+        completed.metadata[
+            "chunk_count"
+        ]
+        == 2
+    )
+
 
 def test_processing_service_marks_failure(
     tmp_path,
@@ -174,20 +307,24 @@ def test_processing_service_marks_failure(
     file_path = tmp_path / "document.pdf"
     file_path.write_bytes(b"test")
 
-    repository = RecordingRepository()
-
-    service = DocumentProcessingService(
-        repository=repository,
-        storage=FakeStorage(file_path),
-        parser=FailingParser(),
+    request = make_request()
+    target = make_target(request)
+    repository = RecordingRepository(
+        target
     )
+    audit = FakeAuditService()
 
     with pytest.raises(
         RuntimeError,
         match="Simulated parser failure",
     ):
-        service.process(
-            make_request()
+        service(
+            repository=repository,
+            storage=FakeStorage(file_path),
+            parser=FailingParser(),
+            audit=audit,
+        ).process(
+            request
         )
 
     assert [
@@ -202,3 +339,157 @@ def test_processing_service_marks_failure(
         repository.calls[1][3]
         == "DOCUMENT_PROCESSING_FAILED"
     )
+
+    assert (
+        repository.calls[1][4]
+        == "Document processing failed."
+    )
+
+    assert (
+        "Simulated parser failure"
+        not in repository.calls[1][4]
+    )
+
+    assert [
+        event.event_type
+        for event in audit.calls
+    ] == [
+        AuditEventType
+        .DOCUMENT_PROCESSING_STARTED,
+        AuditEventType
+        .DOCUMENT_PROCESSING_FAILED,
+    ]
+
+    failed = audit.calls[1]
+
+    assert failed.outcome == AuditOutcome.FAILED
+
+    assert (
+        failed.error_code
+        == "DOCUMENT_PROCESSING_FAILED"
+    )
+
+    # Raw parser exception text must not
+    # enter the audit payload.
+    assert (
+        "Simulated parser failure"
+        not in str(failed.metadata)
+    )
+
+
+def test_started_audit_failure_does_not_block_processing(
+    tmp_path,
+):
+    file_path = tmp_path / "document.pdf"
+    file_path.write_bytes(b"test")
+
+    request = make_request()
+    target = make_target(request)
+    repository = RecordingRepository(
+        target
+    )
+
+    result = service(
+        repository=repository,
+        storage=FakeStorage(file_path),
+        parser=SuccessfulParser(),
+        audit=FakeAuditService(
+            fail_on_event=(
+                AuditEventType
+                .DOCUMENT_PROCESSING_STARTED
+            )
+        ),
+    ).process(
+        request
+    )
+
+    assert result.page_count == 2
+
+    assert [
+        call[0]
+        for call in repository.calls
+    ] == [
+        "processing",
+        "complete",
+    ]
+
+
+def test_completed_audit_failure_does_not_mark_job_failed(
+    tmp_path,
+):
+    file_path = tmp_path / "document.pdf"
+    file_path.write_bytes(b"test")
+
+    request = make_request()
+    target = make_target(request)
+    repository = RecordingRepository(
+        target
+    )
+
+    result = service(
+        repository=repository,
+        storage=FakeStorage(file_path),
+        parser=SuccessfulParser(),
+        audit=FakeAuditService(
+            fail_on_event=(
+                AuditEventType
+                .DOCUMENT_PROCESSING_COMPLETED
+            )
+        ),
+    ).process(
+        request
+    )
+
+    assert result.page_count == 2
+
+    assert [
+        call[0]
+        for call in repository.calls
+    ] == [
+        "processing",
+        "complete",
+    ]
+
+    assert all(
+        call[0] != "failed"
+        for call in repository.calls
+    )
+
+
+def test_failed_audit_failure_preserves_parser_failure(
+    tmp_path,
+):
+    file_path = tmp_path / "document.pdf"
+    file_path.write_bytes(b"test")
+
+    request = make_request()
+    target = make_target(request)
+    repository = RecordingRepository(
+        target
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Simulated parser failure",
+    ):
+        service(
+            repository=repository,
+            storage=FakeStorage(file_path),
+            parser=FailingParser(),
+            audit=FakeAuditService(
+                fail_on_event=(
+                    AuditEventType
+                    .DOCUMENT_PROCESSING_FAILED
+                )
+            ),
+        ).process(
+            request
+        )
+
+    assert [
+        call[0]
+        for call in repository.calls
+    ] == [
+        "processing",
+        "failed",
+    ]

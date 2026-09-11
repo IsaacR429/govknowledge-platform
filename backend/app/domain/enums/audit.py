@@ -1,0 +1,61 @@
+from enum import Enum
+
+
+class AuditOutcome(str, Enum):
+    SUCCEEDED = "SUCCEEDED"
+    DENIED = "DENIED"
+    FAILED = "FAILED"
+
+
+class AuditEventType(str, Enum):
+    AUTH_LOGIN_SUCCEEDED = (
+        "AUTH_LOGIN_SUCCEEDED"
+    )
+    AUTH_LOGIN_FAILED = (
+        "AUTH_LOGIN_FAILED"
+    )
+    AUTH_LOGOUT = "AUTH_LOGOUT"
+
+    DOCUMENT_READ_GRANTED = (
+        "DOCUMENT_READ_GRANTED"
+    )
+    DOCUMENT_READ_DENIED = (
+        "DOCUMENT_READ_DENIED"
+    )
+
+    SOURCE_PAGE_VIEWED = (
+        "SOURCE_PAGE_VIEWED"
+    )
+    SOURCE_PAGE_DENIED = (
+        "SOURCE_PAGE_DENIED"
+    )
+
+    QUERY_SUBMITTED = (
+        "QUERY_SUBMITTED"
+    )
+    EVIDENCE_SUFFICIENT = (
+        "EVIDENCE_SUFFICIENT"
+    )
+    EVIDENCE_INSUFFICIENT = (
+        "EVIDENCE_INSUFFICIENT"
+    )
+
+    CITATION_VALIDATED = (
+        "CITATION_VALIDATED"
+    )
+    CITATION_REJECTED = (
+        "CITATION_REJECTED"
+    )
+
+    DOCUMENT_INGESTED = (
+        "DOCUMENT_INGESTED"
+    )
+    DOCUMENT_PROCESSING_STARTED = (
+        "DOCUMENT_PROCESSING_STARTED"
+    )
+    DOCUMENT_PROCESSING_COMPLETED = (
+        "DOCUMENT_PROCESSING_COMPLETED"
+    )
+    DOCUMENT_PROCESSING_FAILED = (
+        "DOCUMENT_PROCESSING_FAILED"
+    )

@@ -7,6 +7,9 @@ import pytest
 from app.application.ports.entailment_verifier import (
     EntailmentScore,
 )
+from app.application.ports.identity_provider import (
+    CurrentIdentity,
+)
 from app.application.ports.retrieval import (
     RetrievedChunk,
 )
@@ -194,10 +197,56 @@ class FakeEntailmentVerifier:
         )
 
 
+
+class FakeAuditService:
+    def __init__(
+        self,
+        *,
+        fail_on_call=None,
+    ):
+        self.calls = []
+        self.fail_on_call = fail_on_call
+
+    def record(
+        self,
+        event,
+    ):
+        self.calls.append(event)
+
+        if (
+            self.fail_on_call is not None
+            and len(self.calls)
+            == self.fail_on_call
+        ):
+            from app.application.services.audit import (
+                AuditPersistenceError,
+            )
+
+            raise AuditPersistenceError(
+                "Audit unavailable."
+            )
+
+        return uuid4()
+
+
+def current_identity():
+    return CurrentIdentity(
+        user_id=uuid4(),
+        username="employee",
+        display_name="Employee",
+        email=None,
+        department="Finance",
+        language_preference="fr",
+        roles=("EMPLOYEE",),
+    )
+
+
+
 def service(
     *,
     search,
     verifier,
+    audit=None,
     top_k=5,
 ):
     return (
@@ -209,6 +258,11 @@ def service(
                 )
             ),
             policy=AtomicEvidencePolicy(),
+            audit=(
+                audit
+                if audit is not None
+                else FakeAuditService()
+            ),
             top_k=top_k,
         )
     )
@@ -248,7 +302,7 @@ def test_retrieves_each_atomic_claim_independently():
         }
     )
 
-    identity = object()
+    identity = current_identity()
 
     result = service(
         search=search,
@@ -348,7 +402,7 @@ def test_weakest_required_claim_blocks_answer():
         search=search,
         verifier=verifier,
     ).evaluate(
-        identity=object(),
+        identity=current_identity(),
         claims=(
             AtomicClaim(
                 claim_id="A",
@@ -405,7 +459,7 @@ def test_missing_evidence_for_one_claim_blocks_answer():
         search=search,
         verifier=verifier,
     ).evaluate(
-        identity=object(),
+        identity=current_identity(),
         claims=(
             AtomicClaim(
                 claim_id="A",
@@ -451,7 +505,7 @@ def test_no_evidence_for_any_claim_returns_no_evidence():
         search=search,
         verifier=verifier,
     ).evaluate(
-        identity=object(),
+        identity=current_identity(),
         claims=(
             AtomicClaim(
                 claim_id="A",
@@ -501,7 +555,7 @@ def test_only_authorized_search_results_reach_verifier():
         search=search,
         verifier=verifier,
     ).evaluate(
-        identity=object(),
+        identity=current_identity(),
         claims=(
             AtomicClaim(
                 claim_id="A",
@@ -541,7 +595,7 @@ def test_authorization_failure_is_not_swallowed():
             search=search,
             verifier=verifier,
         ).evaluate(
-            identity=object(),
+            identity=current_identity(),
             claims=(
                 AtomicClaim(
                     claim_id="restricted",
@@ -572,7 +626,7 @@ def test_duplicate_claim_ids_fail_before_search():
         match="must be unique",
     ):
         orchestrator.evaluate(
-            identity=object(),
+            identity=current_identity(),
             claims=(
                 AtomicClaim(
                     claim_id="same",
@@ -614,3 +668,234 @@ def test_invalid_top_k_is_rejected():
             ),
             top_k=0,
         )
+
+
+
+def test_orchestration_audits_single_correlated_operation():
+    from app.domain.enums.audit import (
+        AuditEventType,
+    )
+
+    claim_text = "Supported claim"
+
+    search = FakeAuthorizedSearch(
+        results_by_query={
+            claim_text: (
+                chunk(
+                    text="Supporting evidence.",
+                    index=0,
+                ),
+            ),
+        }
+    )
+
+    verifier = FakeEntailmentVerifier(
+        labels_by_claim={
+            claim_text: (
+                EntailmentLabel.ENTAILMENT,
+            ),
+        }
+    )
+
+    audit = FakeAuditService()
+    identity = current_identity()
+    correlation_id = uuid4()
+
+    result = service(
+        search=search,
+        verifier=verifier,
+        audit=audit,
+    ).evaluate(
+        identity=identity,
+        claims=(
+            AtomicClaim(
+                claim_id="A",
+                text=claim_text,
+            ),
+        ),
+        correlation_id=correlation_id,
+    )
+
+    assert result.correlation_id == correlation_id
+    assert len(audit.calls) == 2
+
+    submitted, decision = audit.calls
+
+    assert (
+        submitted.event_type
+        == AuditEventType.QUERY_SUBMITTED
+    )
+
+    assert (
+        decision.event_type
+        == AuditEventType.EVIDENCE_SUFFICIENT
+    )
+
+    assert (
+        submitted.correlation_id
+        == correlation_id
+    )
+    assert (
+        decision.correlation_id
+        == correlation_id
+    )
+
+    assert (
+        submitted.actor_user_id
+        == identity.user_id
+    )
+
+    # Raw claim/query text must never be
+    # copied into audit metadata.
+    assert claim_text not in str(
+        submitted.metadata
+    )
+    assert claim_text not in str(
+        decision.metadata
+    )
+
+    assert decision.metadata[
+        "retrieved_result_count"
+    ] == 1
+
+
+def test_insufficient_evidence_is_audited_once():
+    from app.domain.enums.audit import (
+        AuditEventType,
+    )
+
+    claim_text = "Unsupported claim"
+
+    search = FakeAuthorizedSearch(
+        results_by_query={
+            claim_text: (
+                chunk(
+                    text="Unrelated evidence.",
+                    index=0,
+                ),
+            ),
+        }
+    )
+
+    verifier = FakeEntailmentVerifier(
+        labels_by_claim={
+            claim_text: (
+                EntailmentLabel.NEUTRAL,
+            ),
+        }
+    )
+
+    audit = FakeAuditService()
+
+    result = service(
+        search=search,
+        verifier=verifier,
+        audit=audit,
+    ).evaluate(
+        identity=current_identity(),
+        claims=(
+            AtomicClaim(
+                claim_id="A",
+                text=claim_text,
+            ),
+        ),
+    )
+
+    assert not result.is_sufficient
+    assert len(audit.calls) == 2
+
+    assert (
+        audit.calls[1].event_type
+        == AuditEventType
+        .EVIDENCE_INSUFFICIENT
+    )
+
+    assert (
+        audit.calls[1].metadata[
+            "unsupported_required_claim_count"
+        ]
+        == 1
+    )
+
+
+def test_initial_audit_failure_blocks_retrieval():
+    from app.application.services.audit import (
+        AuditPersistenceError,
+    )
+
+    search = FakeAuthorizedSearch()
+
+    verifier = FakeEntailmentVerifier(
+        labels_by_claim={}
+    )
+
+    with pytest.raises(
+        AuditPersistenceError
+    ):
+        service(
+            search=search,
+            verifier=verifier,
+            audit=FakeAuditService(
+                fail_on_call=1
+            ),
+        ).evaluate(
+            identity=current_identity(),
+            claims=(
+                AtomicClaim(
+                    claim_id="A",
+                    text="Claim",
+                ),
+            ),
+        )
+
+    assert search.calls == []
+    assert verifier.calls == []
+
+
+def test_final_audit_failure_blocks_result_return():
+    from app.application.services.audit import (
+        AuditPersistenceError,
+    )
+
+    claim_text = "Supported"
+
+    search = FakeAuthorizedSearch(
+        results_by_query={
+            claim_text: (
+                chunk(
+                    text="Supported.",
+                    index=0,
+                ),
+            ),
+        }
+    )
+
+    verifier = FakeEntailmentVerifier(
+        labels_by_claim={
+            claim_text: (
+                EntailmentLabel.ENTAILMENT,
+            ),
+        }
+    )
+
+    with pytest.raises(
+        AuditPersistenceError
+    ):
+        service(
+            search=search,
+            verifier=verifier,
+            audit=FakeAuditService(
+                fail_on_call=2
+            ),
+        ).evaluate(
+            identity=current_identity(),
+            claims=(
+                AtomicClaim(
+                    claim_id="A",
+                    text=claim_text,
+                ),
+            ),
+        )
+
+    assert len(search.calls) == 1
+    assert len(verifier.calls) == 1

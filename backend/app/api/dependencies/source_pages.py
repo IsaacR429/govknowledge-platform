@@ -5,6 +5,12 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.api.dependencies.audit import (
+    get_audit_service,
+)
+from app.application.services.audit import (
+    AuditService,
+)
 from app.application.services.authorization import (
     AuthorizationService,
 )
@@ -46,6 +52,10 @@ def get_authorized_source_page_service(
             get_authorization_service
         ),
     ],
+    audit: Annotated[
+        AuditService,
+        Depends(get_audit_service),
+    ],
 ) -> AuthorizedSourcePageService:
     return AuthorizedSourcePageService(
         repository=(
@@ -54,4 +64,5 @@ def get_authorized_source_page_service(
             )
         ),
         authorization=authorization,
+        audit=audit,
     )
