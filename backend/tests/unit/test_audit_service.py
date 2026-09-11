@@ -211,3 +211,55 @@ def test_qa_text_metadata_is_rejected(
                 key: "Sensitive user text",
             }
         )
+
+
+def test_nested_sensitive_metadata_is_rejected():
+    with pytest.raises(
+        UnsafeAuditMetadataError,
+        match="Unsafe audit metadata",
+    ):
+        sanitize_audit_metadata(
+            {
+                "request": {
+                    "prompt": "SECRET",
+                }
+            }
+        )
+
+
+def test_sensitive_metadata_inside_list_is_rejected():
+    with pytest.raises(
+        UnsafeAuditMetadataError,
+        match="Unsafe audit metadata",
+    ):
+        sanitize_audit_metadata(
+            {
+                "operations": [
+                    {
+                        "access-token": "SECRET",
+                    }
+                ]
+            }
+        )
+
+
+def test_safe_nested_metadata_is_preserved():
+    metadata = {
+        "request": {
+            "method": "GET",
+            "status": 200,
+        },
+        "documents": [
+            {
+                "document_id": "abc",
+                "page_number": 4,
+            }
+        ],
+    }
+
+    assert (
+        sanitize_audit_metadata(
+            metadata
+        )
+        == metadata
+    )

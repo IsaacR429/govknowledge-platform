@@ -66,6 +66,64 @@ def _normalized_key(
     )
 
 
+def _sanitize_audit_value(
+    value: object,
+) -> object:
+    if isinstance(
+        value,
+        Mapping,
+    ):
+        sanitized_mapping: dict[
+            str,
+            object,
+        ] = {}
+
+        for key, nested_value in (
+            value.items()
+        ):
+            normalized = _normalized_key(
+                str(key)
+            )
+
+            if (
+                normalized
+                in _FORBIDDEN_METADATA_KEYS
+            ):
+                raise (
+                    UnsafeAuditMetadataError(
+                        "Unsafe audit metadata key."
+                    )
+                )
+
+            sanitized_mapping[
+                str(key)
+            ] = _sanitize_audit_value(
+                nested_value
+            )
+
+        return sanitized_mapping
+
+    if isinstance(
+        value,
+        list,
+    ):
+        return [
+            _sanitize_audit_value(item)
+            for item in value
+        ]
+
+    if isinstance(
+        value,
+        tuple,
+    ):
+        return tuple(
+            _sanitize_audit_value(item)
+            for item in value
+        )
+
+    return value
+
+
 def sanitize_audit_metadata(
     metadata: Mapping[
         str,
@@ -75,25 +133,17 @@ def sanitize_audit_metadata(
     if metadata is None:
         return {}
 
-    sanitized: dict[
-        str,
-        object,
-    ] = {}
+    sanitized = _sanitize_audit_value(
+        metadata
+    )
 
-    for key, value in metadata.items():
-        normalized = _normalized_key(
-            str(key)
+    if not isinstance(
+        sanitized,
+        dict,
+    ):
+        raise UnsafeAuditMetadataError(
+            "Audit metadata must be a mapping."
         )
-
-        if (
-            normalized
-            in _FORBIDDEN_METADATA_KEYS
-        ):
-            raise UnsafeAuditMetadataError(
-                "Unsafe audit metadata key."
-            )
-
-        sanitized[str(key)] = value
 
     return sanitized
 
