@@ -666,6 +666,9 @@ def main() -> None:
             page = source_page_service.get(
                 identity=identity,
                 page_id=page_id,
+                correlation_id=(
+                    supported_result.correlation_id
+                ),
             )
 
             source_pages[page_id] = page
@@ -812,6 +815,8 @@ def main() -> None:
             == created.document_id
             and row.resource_type
             == "source_page"
+            and row.correlation_id
+            == supported_result.correlation_id
             for row in audit_rows
         )
 

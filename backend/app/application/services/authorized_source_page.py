@@ -50,6 +50,7 @@ class AuthorizedSourcePageService:
         *,
         identity: CurrentIdentity,
         page_id: UUID,
+        correlation_id: UUID | None = None,
     ) -> SourcePage:
         page = (
             self._repository
@@ -92,6 +93,7 @@ class AuthorizedSourcePageService:
                         document_id=(
                             page.document_id
                         ),
+                        correlation_id=correlation_id,
                         error_code=(
                             "DOCUMENT_READ_DENIED"
                         ),
@@ -130,6 +132,7 @@ class AuthorizedSourcePageService:
                 resource_type="source_page",
                 resource_id=page.page_id,
                 document_id=page.document_id,
+                correlation_id=correlation_id,
                 metadata={
                     "permission": "READ",
                 },

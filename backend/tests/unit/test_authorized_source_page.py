@@ -362,3 +362,67 @@ def test_source_page_contains_no_storage_path():
         page,
         "file_hash",
     )
+
+
+def test_source_page_view_preserves_query_correlation():
+    page = source_page()
+    correlation_id = uuid4()
+
+    audit = FakeAuditService()
+
+    identity = current_identity()
+
+    result = AuthorizedSourcePageService(
+        repository=(
+            FakeSourcePageRepository(
+                page
+            )
+        ),
+        authorization=(
+            FakeAuthorizationService()
+        ),
+        audit=audit,
+    ).get(
+        identity=identity,
+        page_id=page.page_id,
+        correlation_id=correlation_id,
+    )
+
+    assert result == page
+
+    assert len(audit.calls) == 1
+
+    assert (
+        audit.calls[0].correlation_id
+        == correlation_id
+    )
+
+
+def test_direct_source_page_view_has_no_correlation():
+    page = source_page()
+
+    audit = FakeAuditService()
+
+    identity = current_identity()
+
+    AuthorizedSourcePageService(
+        repository=(
+            FakeSourcePageRepository(
+                page
+            )
+        ),
+        authorization=(
+            FakeAuthorizationService()
+        ),
+        audit=audit,
+    ).get(
+        identity=identity,
+        page_id=page.page_id,
+    )
+
+    assert len(audit.calls) == 1
+
+    assert (
+        audit.calls[0].correlation_id
+        is None
+    )
