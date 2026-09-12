@@ -609,6 +609,74 @@ def test_authorization_failure_is_not_swallowed():
     assert verifier.calls == []
 
 
+def test_multi_claim_authorization_failure_aborts_entire_request():
+    authorized_claim = "Authorized claim"
+    restricted_claim = "Restricted claim"
+
+    search = FakeAuthorizedSearch(
+        results_by_query={
+            authorized_claim: (
+                chunk(
+                    text="Authorized evidence.",
+                    index=0,
+                ),
+            ),
+        },
+        fail_on_query=restricted_claim,
+    )
+
+    verifier = FakeEntailmentVerifier(
+        labels_by_claim={
+            authorized_claim: (
+                EntailmentLabel.ENTAILMENT,
+            ),
+        }
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Authorization boundary",
+    ):
+        service(
+            search=search,
+            verifier=verifier,
+        ).evaluate(
+            identity=current_identity(),
+            claims=(
+                AtomicClaim(
+                    claim_id="authorized",
+                    text=authorized_claim,
+                ),
+                AtomicClaim(
+                    claim_id="restricted",
+                    text=restricted_claim,
+                ),
+            ),
+        )
+
+    # Claim 1 completed normally before
+    # claim 2 hit the authorization boundary.
+    assert [
+        call[1]
+        for call in search.calls
+    ] == [
+        authorized_claim,
+        restricted_claim,
+    ]
+
+    # Only claim 1 was allowed to reach NLI.
+    # Claim 2 must never be converted into
+    # "no evidence" or otherwise verified.
+    assert verifier.calls == [
+        (
+            authorized_claim,
+            (
+                "Authorized evidence.",
+            ),
+        ),
+    ]
+
+
 def test_duplicate_claim_ids_fail_before_search():
     search = FakeAuthorizedSearch()
 

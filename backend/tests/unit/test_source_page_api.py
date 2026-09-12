@@ -126,6 +126,44 @@ def endpoint(
     )
 
 
+def test_unauthenticated_source_page_is_rejected():
+    service = FakeSourcePageService(
+        page=source_page()
+    )
+
+    app = create_app()
+
+    # Override only the protected business service.
+    # Do NOT override get_current_identity here:
+    # we want the real authentication dependency.
+    app.dependency_overrides[
+        get_authorized_source_page_service
+    ] = lambda: service
+
+    client = TestClient(app)
+
+    response = client.get(
+        endpoint(uuid4())
+    )
+
+    assert response.status_code == 401
+
+    assert response.json() == {
+        "detail": "Authentication required."
+    }
+
+    assert (
+        response.headers[
+            "www-authenticate"
+        ]
+        == "Bearer"
+    )
+
+    # Authentication must stop the request before
+    # protected source-page logic is executed.
+    assert service.calls == []
+
+
 def test_authorized_source_page_is_returned():
     page = source_page()
 

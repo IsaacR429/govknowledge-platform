@@ -263,3 +263,28 @@ def test_safe_nested_metadata_is_preserved():
         )
         == metadata
     )
+
+
+@pytest.mark.parametrize(
+    "key",
+    (
+        "api_key",
+        "client-secret",
+        "private key",
+        "secret",
+    ),
+)
+def test_nested_provider_credentials_are_rejected(
+    key,
+):
+    with pytest.raises(
+        UnsafeAuditMetadataError,
+        match="Unsafe audit metadata",
+    ):
+        sanitize_audit_metadata(
+            {
+                "provider": {
+                    key: "SECRET",
+                }
+            }
+        )

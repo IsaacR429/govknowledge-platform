@@ -2,6 +2,9 @@ from uuid import uuid4
 
 from sqlalchemy import delete, select
 
+from app.application.ports.authorization import (
+    AuthorizationScope,
+)
 from app.application.ports.identity_provider import (
     CurrentIdentity,
 )
@@ -78,6 +81,14 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
     secret_page_id = uuid4()
     secret_chunk_id = uuid4()
     secret_embedding_id = uuid4()
+
+    archived_document_id = uuid4()
+    archived_version_id = uuid4()
+    archived_page_id = uuid4()
+    archived_chunk_id = uuid4()
+    archived_embedding_id = uuid4()
+
+    archived_permission_id = uuid4()
 
     permission_id = uuid4()
 
@@ -303,14 +314,127 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
             )
         )
 
-        # The employee gets READ permission
-        # ONLY for the weaker authorized document.
+        # -----------------------------------------
+        # Archived document.
+        #
+        # The employee DOES have READ permission,
+        # and its vector is an exact query match.
+        #
+        # It must still be excluded because
+        # archived documents are not active
+        # knowledge.
+        # -----------------------------------------
+        db.add(
+            Document(
+                id=archived_document_id,
+                title="Archived Policy",
+                description=(
+                    "Archived security test "
+                    "document."
+                ),
+                document_type="POLICY",
+                issuing_organization=(
+                    "GovKnowledge Test"
+                ),
+                jurisdiction="Test",
+                language="en",
+                publication_date=None,
+                source_url=None,
+                status="ARCHIVED",
+                confidentiality_level="PUBLIC",
+            )
+        )
+
+        db.add(
+            DocumentVersion(
+                id=archived_version_id,
+                document_id=archived_document_id,
+                version_number=1,
+                original_filename="archived.pdf",
+                storage_path="security/archived.pdf",
+                file_hash="c" * 64,
+                processing_status=(
+                    ProcessingStatus.SUCCEEDED.value
+                ),
+                effective_date=None,
+                superseded_at=None,
+            )
+        )
+
+        db.add(
+            DocumentPage(
+                id=archived_page_id,
+                document_version_id=(
+                    archived_version_id
+                ),
+                page_number=1,
+                extracted_text=(
+                    "Archived policy evidence."
+                ),
+                metadata_json={},
+            )
+        )
+
+        db.add(
+            DocumentChunk(
+                id=archived_chunk_id,
+                document_id=archived_document_id,
+                document_version_id=(
+                    archived_version_id
+                ),
+                page_id=archived_page_id,
+                page_start=1,
+                page_end=1,
+                chunk_index=0,
+                section_title=None,
+                content=(
+                    "ARCHIVED POLICY: this is a "
+                    "perfect vector match."
+                ),
+                language="en",
+                metadata_json={},
+            )
+        )
+
+        db.flush()
+
+        db.add(
+            ChunkEmbedding(
+                id=archived_embedding_id,
+                chunk_id=archived_chunk_id,
+                model_name=MODEL_NAME,
+                model_revision=MODEL_REVISION,
+                dimension=EMBEDDING_DIMENSION,
+                normalized=True,
+                embedding=make_unit_vector(
+                    1.0,
+                    0.0,
+                ),
+            )
+        )
+
+        # The employee gets READ permission for
+        # both the active allowed document and
+        # the archived document.
+        #
+        # The SECRET document remains unauthorized.
         db.add(
             DocumentPermission(
                 id=permission_id,
                 user_id=user_id,
                 document_id=(
                     allowed_document_id
+                ),
+                action=PermissionAction.READ.value,
+            )
+        )
+
+        db.add(
+            DocumentPermission(
+                id=archived_permission_id,
+                user_id=user_id,
+                document_id=(
+                    archived_document_id
                 ),
                 action=PermissionAction.READ.value,
             )
@@ -386,6 +510,46 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
             )
         )
 
+        archived_control = db.execute(
+            select(
+                DocumentChunk.document_id,
+                DocumentChunk.id,
+                distance.label("distance"),
+            )
+            .join(
+                ChunkEmbedding,
+                ChunkEmbedding.chunk_id
+                == DocumentChunk.id,
+            )
+            .where(
+                ChunkEmbedding.model_name
+                == MODEL_NAME,
+                ChunkEmbedding.model_revision
+                == MODEL_REVISION,
+                DocumentChunk.document_id.in_(
+                    (
+                        allowed_document_id,
+                        archived_document_id,
+                    )
+                ),
+            )
+            .order_by(
+                distance
+            )
+        ).all()
+
+        assert len(archived_control) == 2
+
+        assert (
+            archived_control[0].document_id
+            == archived_document_id
+        )
+
+        assert (
+            archived_control[0].id
+            == archived_chunk_id
+        )
+
         db.rollback()
 
         # -----------------------------------------
@@ -430,6 +594,10 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
             secret_document_id
         )
 
+        assert not scope.allows(
+            archived_document_id
+        )
+
         # -----------------------------------------
         # Real pgvector retrieval adapter.
         # -----------------------------------------
@@ -444,7 +612,7 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
             query_vector=query_vector,
             model_name=MODEL_NAME,
             model_revision=MODEL_REVISION,
-            top_k=10,
+            top_k=1,
         )
 
         assert len(results) == 1
@@ -473,6 +641,93 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
             for result in results
         )
 
+        # -----------------------------------------
+        # Defense-in-depth attack:
+        #
+        # Fabricate a stale/malformed scope that
+        # incorrectly includes an archived document.
+        #
+        # The retrieval adapter must independently
+        # enforce Document.status == ACTIVE.
+        # -----------------------------------------
+        stale_scope = AuthorizationScope(
+            user_id=user_id,
+            action=PermissionAction.READ,
+            document_ids=frozenset(
+                {
+                    allowed_document_id,
+                    archived_document_id,
+                }
+            ),
+        )
+
+        stale_scope_results = (
+            retrieval.search_authorized(
+                scope=stale_scope,
+                query_vector=query_vector,
+                model_name=MODEL_NAME,
+                model_revision=MODEL_REVISION,
+                top_k=1,
+            )
+        )
+
+        assert len(stale_scope_results) == 1
+
+        assert (
+            stale_scope_results[0].document_id
+            == allowed_document_id
+        )
+
+        assert (
+            stale_scope_results[0].chunk_id
+            == allowed_chunk_id
+        )
+
+        assert all(
+            result.document_id
+            != archived_document_id
+            for result in stale_scope_results
+        )
+
+        assert all(
+            result.chunk_id
+            != archived_chunk_id
+            for result in stale_scope_results
+        )
+
+        # -----------------------------------------
+        # Non-SUCCEEDED version defense.
+        #
+        # The document remains ACTIVE and the user
+        # remains authorized, but its version is now
+        # FAILED. Its persisted embedding must no
+        # longer be retrievable.
+        # -----------------------------------------
+        allowed_version = db.get(
+            DocumentVersion,
+            allowed_version_id,
+        )
+
+        assert allowed_version is not None
+
+        allowed_version.processing_status = (
+            ProcessingStatus.FAILED.value
+        )
+
+        db.flush()
+
+        failed_version_results = (
+            retrieval.search_authorized(
+                scope=scope,
+                query_vector=query_vector,
+                model_name=MODEL_NAME,
+                model_revision=MODEL_REVISION,
+                top_k=1,
+            )
+        )
+
+        assert failed_version_results == ()
+
     finally:
         db.rollback()
 
@@ -484,6 +739,7 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
                     (
                         allowed_embedding_id,
                         secret_embedding_id,
+                        archived_embedding_id,
                     )
                 )
             )
@@ -493,8 +749,12 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
             delete(
                 DocumentPermission
             ).where(
-                DocumentPermission.id
-                == permission_id
+                DocumentPermission.id.in_(
+                    (
+                        permission_id,
+                        archived_permission_id,
+                    )
+                )
             )
         )
 
@@ -506,6 +766,7 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
                     (
                         allowed_chunk_id,
                         secret_chunk_id,
+                        archived_chunk_id,
                     )
                 )
             )
@@ -519,6 +780,7 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
                     (
                         allowed_page_id,
                         secret_page_id,
+                        archived_page_id,
                     )
                 )
             )
@@ -532,6 +794,7 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
                     (
                         allowed_version_id,
                         secret_version_id,
+                        archived_version_id,
                     )
                 )
             )
@@ -545,6 +808,7 @@ def test_unauthorized_strongest_vector_is_never_retrieved():
                     (
                         allowed_document_id,
                         secret_document_id,
+                        archived_document_id,
                     )
                 )
             )
