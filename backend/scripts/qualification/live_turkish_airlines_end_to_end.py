@@ -13,12 +13,16 @@ from sqlalchemy import func, select
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
+from app.api.dependencies.llm import get_llm_provider
 from app.application.ports.identity_provider import CurrentIdentity
 from app.application.services.audit import AuditService
 from app.application.services.authorization import AuthorizationService
 from app.application.services.authorized_search import AuthorizedSearchService
 from app.application.services.authorized_source_page import (
     AuthorizedSourcePageService,
+)
+from app.application.services.grounded_answer_generation import (
+    GroundedAnswerGenerationService,
 )
 from app.application.services.atomic_evidence_orchestration import (
     AtomicClaim,
@@ -648,6 +652,46 @@ def main() -> None:
 
         print()
         print("Canonical citation validation: PASS")
+
+        print()
+        print("=" * 78)
+        print("REAL GROUNDED LLM ANSWER")
+        print("=" * 78)
+
+        answer_service = GroundedAnswerGenerationService(
+            citation_service=citation_service,
+            provider=get_llm_provider(get_settings()),
+        )
+
+        answer_result = answer_service.generate(
+            question=(
+                "Quel est le delai pour signaler "
+                "un bagage enregistre endommage ?"
+            ),
+            evidence_result=supported_result,
+            language="fr",
+        )
+
+        assert answer_result.status == "SUPPORTED"
+        assert answer_result.citations.citations
+        assert answer_result.cited_evidence_ids
+
+        print("Grounded answer status:", answer_result.status)
+
+        print()
+        print("ANSWER:")
+        print(
+            answer_result.answer
+            .encode("unicode_escape")
+            .decode("ascii")
+        )
+
+        print()
+        print("CITED EVIDENCE IDS:")
+        print(answer_result.cited_evidence_ids)
+
+        print()
+        print("Grounded Claude answer: PASS")
 
         source_page_service = AuthorizedSourcePageService(
             repository=PostgresSourcePageRepository(db),

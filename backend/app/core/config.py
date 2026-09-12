@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +19,14 @@ class Settings(BaseSettings):
 
     auth_session_ttl_minutes: int = 480
     document_storage_root: str = "data/documents"
+
+    # Anthropic is optional at application startup.
+    # Provider construction will fail closed if these
+    # values are missing when LLM generation is requested.
+    anthropic_api_key: SecretStr | None = None
+    anthropic_workspace_id: str | None = None
+    anthropic_model: str | None = None
+    anthropic_max_tokens: int = 1024
 
     model_config = SettingsConfigDict(
         env_file=".env",
