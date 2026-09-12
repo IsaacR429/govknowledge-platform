@@ -1,4 +1,4 @@
-﻿from importlib.metadata import version
+from importlib.metadata import version
 from pathlib import Path
 
 from app.infrastructure.parsing.docling_parser import (
@@ -212,3 +212,78 @@ def test_docling_parser_rejects_missing_file(
             missing,
             language="fr",
         )
+
+
+def test_oversized_paragraph_does_not_split_inside_word() -> None:
+    parser = DoclingDocumentParser(
+        converter=object(),
+        max_chunk_chars=100,
+    )
+
+    # 95 chars + one space means "urgence"
+    # starts at position 96.
+    #
+    # A hard cut at character 100 produces:
+    #
+    #   ... "urge" | "nce ..."
+    #
+    # which deliberately forces a mid-word boundary.
+    text = (
+        ("A" * 95)
+        + " urgence de niveau 3, "
+        + "le montant est de 750 000 dollars. "
+        + ("B" * 100)
+    )
+
+    chunks = parser._split_page(text)
+
+    assert len(chunks) >= 2
+
+    for left, right in zip(
+        chunks,
+        chunks[1:],
+    ):
+        if left and right and left[-1].isalnum() and right[0].isalnum():
+            last_word_of_left = left.split()[-1]
+            first_word_of_right = right.split()[0]
+
+            assert (
+                f"{last_word_of_left} {first_word_of_right}" in text
+                or f"{last_word_of_left}\n{first_word_of_right}" in text
+            ), (
+                "Chunk boundary split a word: "
+                f"{left[-20:]!r} | {right[:20]!r}"
+            )
+
+
+def test_oversized_paragraph_prefers_sentence_boundary() -> None:
+    parser = DoclingDocumentParser(
+        converter=object(),
+        max_chunk_chars=100,
+    )
+
+    first_sentence = (
+        ("alpha " * 10)
+        + "fin."
+    )
+
+    second_sentence = (
+        "Deuxieme phrase "
+        + ("beta " * 25)
+    )
+
+    text = (
+        first_sentence
+        + " "
+        + second_sentence
+    )
+
+    chunks = parser._split_page(text)
+
+    assert len(chunks) >= 2
+
+    assert chunks[0] == first_sentence
+
+    assert chunks[1].startswith(
+        "Deuxieme phrase"
+    )

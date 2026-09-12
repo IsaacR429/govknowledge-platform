@@ -298,18 +298,73 @@ class DoclingDocumentParser(DocumentParser):
             ):
                 flush()
 
-                for start in range(
-                    0,
-                    len(paragraph),
-                    self._max_chunk_chars,
-                ):
-                    piece = paragraph[
-                        start:
-                        start + self._max_chunk_chars
+                remaining = paragraph
+
+                while remaining:
+                    if (
+                        len(remaining)
+                        <= self._max_chunk_chars
+                    ):
+                        piece = remaining.strip()
+
+                        if piece:
+                            chunks.append(piece)
+
+                        break
+
+                    window = remaining[
+                        :self._max_chunk_chars
+                    ]
+
+                    # Prefer ending after a complete sentence.
+                    sentence_boundaries = (
+                        window.rfind(". "),
+                        window.rfind("? "),
+                        window.rfind("! "),
+                        window.rfind(".\n"),
+                        window.rfind("?\n"),
+                        window.rfind("!\n"),
+                    )
+
+                    boundary = max(
+                        sentence_boundaries
+                    )
+
+                    if boundary >= (
+                        self._max_chunk_chars // 2
+                    ):
+                        # Keep the punctuation in this chunk.
+                        boundary += 1
+                    else:
+                        # Otherwise fall back to the last
+                        # whitespace before the hard limit.
+                        whitespace_boundaries = (
+                            window.rfind(" "),
+                            window.rfind("\n"),
+                            window.rfind("\t"),
+                        )
+
+                        boundary = max(
+                            whitespace_boundaries
+                        )
+
+                        if boundary < 1:
+                            # Pathological case: one token itself
+                            # exceeds the configured limit.
+                            boundary = (
+                                self._max_chunk_chars
+                            )
+
+                    piece = remaining[
+                        :boundary
                     ].strip()
 
                     if piece:
                         chunks.append(piece)
+
+                    remaining = remaining[
+                        boundary:
+                    ].strip()
 
                 continue
 
