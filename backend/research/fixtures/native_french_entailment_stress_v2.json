@@ -1,0 +1,338 @@
+[
+  {
+    "id": "FS01",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque. Cela consiste notamment \u00e0 planifier, analyser et engager le march\u00e9, \u00e9laborer une strat\u00e9gie, solliciter et \u00e9valuer les Candidatures/Prix/Offres/Propositions, et \u00e0 attribuer et g\u00e9rer les march\u00e9s et contrats.",
+    "claim": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque.",
+    "expected": "SUPPORTED",
+    "category": "paraphrase"
+  },
+  {
+    "id": "FS02",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque. Cela consiste notamment \u00e0 planifier, analyser et engager le march\u00e9, \u00e9laborer une strat\u00e9gie, solliciter et \u00e9valuer les Candidatures/Prix/Offres/Propositions, et \u00e0 attribuer et g\u00e9rer les march\u00e9s et contrats.",
+    "claim": "Les responsabilit\u00e9s de l'Emprunteur comprennent notamment l'\u00e9valuation des offres et propositions.",
+    "expected": "SUPPORTED",
+    "category": "subset"
+  },
+  {
+    "id": "FS03",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque. Cela consiste notamment \u00e0 planifier, analyser et engager le march\u00e9, \u00e9laborer une strat\u00e9gie, solliciter et \u00e9valuer les Candidatures/Prix/Offres/Propositions, et \u00e0 attribuer et g\u00e9rer les march\u00e9s et contrats.",
+    "claim": "La Banque est seule responsable de la conduite des activit\u00e9s de passation des march\u00e9s.",
+    "expected": "CONTRADICTED",
+    "category": "entity_swap"
+  },
+  {
+    "id": "FS04",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque. Cela consiste notamment \u00e0 planifier, analyser et engager le march\u00e9, \u00e9laborer une strat\u00e9gie, solliciter et \u00e9valuer les Candidatures/Prix/Offres/Propositions, et \u00e0 attribuer et g\u00e9rer les march\u00e9s et contrats.",
+    "claim": "L'Emprunteur n'a aucune responsabilit\u00e9 dans la passation des march\u00e9s financ\u00e9s par la Banque.",
+    "expected": "CONTRADICTED",
+    "category": "negation"
+  },
+  {
+    "id": "FS05",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque. Cela consiste notamment \u00e0 planifier, analyser et engager le march\u00e9, \u00e9laborer une strat\u00e9gie, solliciter et \u00e9valuer les Candidatures/Prix/Offres/Propositions, et \u00e0 attribuer et g\u00e9rer les march\u00e9s et contrats.",
+    "claim": "L'Emprunteur est uniquement charg\u00e9 d'attribuer les march\u00e9s et ne participe jamais \u00e0 leur planification.",
+    "expected": "CONTRADICTED",
+    "category": "scope"
+  },
+  {
+    "id": "FS06",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque. Cela consiste notamment \u00e0 planifier, analyser et engager le march\u00e9, \u00e9laborer une strat\u00e9gie, solliciter et \u00e9valuer les Candidatures/Prix/Offres/Propositions, et \u00e0 attribuer et g\u00e9rer les march\u00e9s et contrats.",
+    "claim": "Tous les march\u00e9s publics du pays, quelle que soit leur source de financement, rel\u00e8vent de la responsabilit\u00e9 de l'Emprunteur selon cette disposition.",
+    "expected": "OVERCLAIM",
+    "category": "scope"
+  },
+  {
+    "id": "FS07",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque. Cela consiste notamment \u00e0 planifier, analyser et engager le march\u00e9, \u00e9laborer une strat\u00e9gie, solliciter et \u00e9valuer les Candidatures/Prix/Offres/Propositions, et \u00e0 attribuer et g\u00e9rer les march\u00e9s et contrats.",
+    "claim": "L'Emprunteur doit obligatoirement utiliser une intelligence artificielle pour \u00e9valuer les offres.",
+    "expected": "UNSUPPORTED",
+    "category": "unsupported_addition"
+  },
+  {
+    "id": "FS08",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque. Cela consiste notamment \u00e0 planifier, analyser et engager le march\u00e9, \u00e9laborer une strat\u00e9gie, solliciter et \u00e9valuer les Candidatures/Prix/Offres/Propositions, et \u00e0 attribuer et g\u00e9rer les march\u00e9s et contrats.",
+    "claim": "La Banque \u00e9value directement toutes les offres \u00e0 la place de l'Emprunteur.",
+    "expected": "CONTRADICTED",
+    "category": "role_reversal"
+  },
+  {
+    "id": "FS09",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "L'appui de la Banque ne transf\u00e8re pas \u00e0 la Banque la responsabilit\u00e9 d'ex\u00e9cution du projet.",
+    "expected": "SUPPORTED",
+    "category": "paraphrase"
+  },
+  {
+    "id": "FS10",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "L'Emprunteur reste responsable de l'ex\u00e9cution du projet.",
+    "expected": "SUPPORTED",
+    "category": "subset"
+  },
+  {
+    "id": "FS11",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "La Banque ex\u00e9cute les op\u00e9rations de passation des march\u00e9s \u00e0 la place de l'Emprunteur.",
+    "expected": "CONTRADICTED",
+    "category": "role_reversal"
+  },
+  {
+    "id": "FS12",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "La Banque n'apporte jamais aucune forme d'appui \u00e0 l'Emprunteur.",
+    "expected": "CONTRADICTED",
+    "category": "negation"
+  },
+  {
+    "id": "FS13",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "D\u00e8s que la Banque fournit un appui, elle devient automatiquement responsable de l'ex\u00e9cution du projet.",
+    "expected": "CONTRADICTED",
+    "category": "condition"
+  },
+  {
+    "id": "FS14",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "La Banque peut remplacer librement l'Emprunteur lorsque le projet est complexe.",
+    "expected": "UNSUPPORTED",
+    "category": "exception_invention"
+  },
+  {
+    "id": "FS15",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "L'appui de la Banque est toujours identique pour tous les projets.",
+    "expected": "CONTRADICTED",
+    "category": "quantifier"
+  },
+  {
+    "id": "FS16",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "Le champ de l'appui est d\u00e9termin\u00e9 au cas par cas.",
+    "expected": "SUPPORTED",
+    "category": "paraphrase"
+  },
+  {
+    "id": "FS17",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "L'ad\u00e9quation d'un syst\u00e8me de d\u00e9mat\u00e9rialisation tient notamment compte de sa s\u00e9curit\u00e9 et de sa confidentialit\u00e9.",
+    "expected": "SUPPORTED",
+    "category": "subset"
+  },
+  {
+    "id": "FS18",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "L'accessibilit\u00e9 et l'int\u00e9grit\u00e9 font partie des caract\u00e9ristiques consid\u00e9r\u00e9es.",
+    "expected": "SUPPORTED",
+    "category": "subset"
+  },
+  {
+    "id": "FS19",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "La s\u00e9curit\u00e9 est la seule condition permettant de juger le syst\u00e8me ad\u00e9quat.",
+    "expected": "OVERCLAIM",
+    "category": "exclusivity"
+  },
+  {
+    "id": "FS20",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "La confidentialit\u00e9 n'est pas n\u00e9cessaire pour un syst\u00e8me ad\u00e9quat.",
+    "expected": "CONTRADICTED",
+    "category": "negation"
+  },
+  {
+    "id": "FS21",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "Tout syst\u00e8me accessible est automatiquement consid\u00e9r\u00e9 comme ad\u00e9quat.",
+    "expected": "OVERCLAIM",
+    "category": "condition"
+  },
+  {
+    "id": "FS22",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "Le syst\u00e8me doit obligatoirement utiliser une blockchain publique.",
+    "expected": "UNSUPPORTED",
+    "category": "technology_invention"
+  },
+  {
+    "id": "FS23",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "La Banque ne tient compte d'aucune caract\u00e9ristique de contr\u00f4le ou de suivi.",
+    "expected": "CONTRADICTED",
+    "category": "negation"
+  },
+  {
+    "id": "FS24",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "La disposition impose exactement cinq contr\u00f4les techniques et aucun autre.",
+    "expected": "OVERCLAIM",
+    "category": "numeric_scope"
+  },
+  {
+    "id": "FS25",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur. L'Emprunteur peut aussi traduire ces documents dans une autre langue, \u00e0 savoir la Langue Nationale. En cas de diff\u00e9rences, le texte en anglais, espagnol ou fran\u00e7ais pr\u00e9vaut.",
+    "claim": "Les documents peuvent \u00eatre \u00e9tablis en fran\u00e7ais.",
+    "expected": "SUPPORTED",
+    "category": "subset"
+  },
+  {
+    "id": "FS26",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur. L'Emprunteur peut aussi traduire ces documents dans une autre langue, \u00e0 savoir la Langue Nationale. En cas de diff\u00e9rences, le texte en anglais, espagnol ou fran\u00e7ais pr\u00e9vaut.",
+    "claim": "L'Emprunteur peut traduire les documents dans la Langue Nationale.",
+    "expected": "SUPPORTED",
+    "category": "paraphrase"
+  },
+  {
+    "id": "FS27",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur. L'Emprunteur peut aussi traduire ces documents dans une autre langue, \u00e0 savoir la Langue Nationale. En cas de diff\u00e9rences, le texte en anglais, espagnol ou fran\u00e7ais pr\u00e9vaut.",
+    "claim": "Les documents doivent obligatoirement \u00eatre r\u00e9dig\u00e9s uniquement en anglais.",
+    "expected": "CONTRADICTED",
+    "category": "exclusivity"
+  },
+  {
+    "id": "FS28",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur. L'Emprunteur peut aussi traduire ces documents dans une autre langue, \u00e0 savoir la Langue Nationale. En cas de diff\u00e9rences, le texte en anglais, espagnol ou fran\u00e7ais pr\u00e9vaut.",
+    "claim": "Les documents doivent toujours \u00eatre produits simultan\u00e9ment en anglais, espagnol et fran\u00e7ais.",
+    "expected": "OVERCLAIM",
+    "category": "quantifier"
+  },
+  {
+    "id": "FS29",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur. L'Emprunteur peut aussi traduire ces documents dans une autre langue, \u00e0 savoir la Langue Nationale. En cas de diff\u00e9rences, le texte en anglais, espagnol ou fran\u00e7ais pr\u00e9vaut.",
+    "claim": "En cas de diff\u00e9rence, la version en Langue Nationale pr\u00e9vaut toujours.",
+    "expected": "CONTRADICTED",
+    "category": "precedence_reversal"
+  },
+  {
+    "id": "FS30",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur. L'Emprunteur peut aussi traduire ces documents dans une autre langue, \u00e0 savoir la Langue Nationale. En cas de diff\u00e9rences, le texte en anglais, espagnol ou fran\u00e7ais pr\u00e9vaut.",
+    "claim": "L'allemand est obligatoire pour toute passation de march\u00e9.",
+    "expected": "UNSUPPORTED",
+    "category": "unsupported_addition"
+  },
+  {
+    "id": "FS31",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur. L'Emprunteur peut aussi traduire ces documents dans une autre langue, \u00e0 savoir la Langue Nationale. En cas de diff\u00e9rences, le texte en anglais, espagnol ou fran\u00e7ais pr\u00e9vaut.",
+    "claim": "L'Emprunteur n'a aucun choix concernant la langue des documents.",
+    "expected": "CONTRADICTED",
+    "category": "negation"
+  },
+  {
+    "id": "FS32",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur. L'Emprunteur peut aussi traduire ces documents dans une autre langue, \u00e0 savoir la Langue Nationale. En cas de diff\u00e9rences, le texte en anglais, espagnol ou fran\u00e7ais pr\u00e9vaut.",
+    "claim": "Une traduction dans la Langue Nationale remplace juridiquement dans tous les cas les textes anglais, espagnol ou fran\u00e7ais.",
+    "expected": "CONTRADICTED",
+    "category": "precedence_reversal"
+  },
+  {
+    "id": "FS33",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Une proposition re\u00e7ue hors d\u00e9lai est rejet\u00e9e.",
+    "expected": "SUPPORTED",
+    "category": "singularization"
+  },
+  {
+    "id": "FS34",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Une offre arriv\u00e9e apr\u00e8s le d\u00e9lai est rejet\u00e9e.",
+    "expected": "SUPPORTED",
+    "category": "paraphrase"
+  },
+  {
+    "id": "FS35",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Une offre re\u00e7ue apr\u00e8s le d\u00e9lai doit \u00eatre accept\u00e9e.",
+    "expected": "CONTRADICTED",
+    "category": "polarity"
+  },
+  {
+    "id": "FS36",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Toutes les offres sont automatiquement rejet\u00e9es, m\u00eame lorsqu'elles sont re\u00e7ues dans les d\u00e9lais.",
+    "expected": "OVERCLAIM",
+    "category": "quantifier"
+  },
+  {
+    "id": "FS37",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Les propositions re\u00e7ues hors d\u00e9lai peuvent toujours \u00eatre accept\u00e9es \u00e0 la discr\u00e9tion de l'Emprunteur.",
+    "expected": "CONTRADICTED",
+    "category": "modality"
+  },
+  {
+    "id": "FS38",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Toute offre rejet\u00e9e entra\u00eene automatiquement une amende de 500 000 francs suisses.",
+    "expected": "UNSUPPORTED",
+    "category": "number_invention"
+  },
+  {
+    "id": "FS39",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Seules les offres, mais jamais les propositions, sont concern\u00e9es par la r\u00e8gle de rejet hors d\u00e9lai.",
+    "expected": "CONTRADICTED",
+    "category": "scope"
+  },
+  {
+    "id": "FS40",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Une offre tardive peut \u00eatre accept\u00e9e si elle arrive avant l'ouverture publique des plis.",
+    "expected": "UNSUPPORTED",
+    "category": "exception_invention"
+  },
+  {
+    "id": "FS41",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat. Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "La Banque examine et approuve le Plan de Passation des March\u00e9s avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat.",
+    "expected": "SUPPORTED",
+    "category": "paraphrase"
+  },
+  {
+    "id": "FS42",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat. Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "Le plan initial couvre normalement au moins les dix-huit premiers mois de mise en \u0153uvre.",
+    "expected": "SUPPORTED",
+    "category": "paraphrase"
+  },
+  {
+    "id": "FS43",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat. Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "La Banque n'examine le Plan de Passation des March\u00e9s qu'apr\u00e8s l'ach\u00e8vement des n\u00e9gociations.",
+    "expected": "CONTRADICTED",
+    "category": "temporal_reversal"
+  },
+  {
+    "id": "FS44",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat. Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "L'Emprunteur peut attendre la fin des n\u00e9gociations avant de pr\u00e9parer le plan.",
+    "expected": "CONTRADICTED",
+    "category": "temporal_reversal"
+  },
+  {
+    "id": "FS45",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat. Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "Tous les Plans de Passation des March\u00e9s doivent toujours couvrir exactement dix-huit mois.",
+    "expected": "OVERCLAIM",
+    "category": "quantifier"
+  },
+  {
+    "id": "FS46",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat. Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "Le plan initial doit couvrir au maximum dix-huit mois.",
+    "expected": "CONTRADICTED",
+    "category": "numeric_reversal"
+  },
+  {
+    "id": "FS47",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat. Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "Le Plan de Passation des March\u00e9s co\u00fbte douze millions de dollars par an.",
+    "expected": "UNSUPPORTED",
+    "category": "number_invention"
+  },
+  {
+    "id": "FS48",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat. Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "La Banque n'a aucun r\u00f4le dans l'examen ou l'approbation du Plan de Passation des March\u00e9s.",
+    "expected": "CONTRADICTED",
+    "category": "role_reversal"
+  }
+]

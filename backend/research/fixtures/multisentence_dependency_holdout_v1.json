@@ -1,0 +1,194 @@
+[
+  {
+    "id": "MH01",
+    "context": "Dans le pr\u00e9sent r\u00e8glement, l'Autorit\u00e9 comp\u00e9tente d\u00e9signe le ministre charg\u00e9 des finances. L'Autorit\u00e9 comp\u00e9tente approuve le plan annuel de contr\u00f4le. Le secr\u00e9tariat conserve les archives pendant dix ans. Les rapports sont num\u00e9rot\u00e9s dans l'ordre chronologique. Chaque direction transmet ses observations au secr\u00e9tariat. Le registre est mis \u00e0 jour au moins une fois par trimestre.",
+    "claim": "Le ministre charg\u00e9 des finances approuve le plan annuel de contr\u00f4le.",
+    "expected": "SUPPORTED",
+    "support_scope": "pair",
+    "category": "definition"
+  },
+  {
+    "id": "MH02",
+    "context": "Dans le pr\u00e9sent r\u00e8glement, l'Autorit\u00e9 comp\u00e9tente d\u00e9signe le ministre charg\u00e9 des finances. L'Autorit\u00e9 comp\u00e9tente approuve le plan annuel de contr\u00f4le. Le secr\u00e9tariat conserve les archives pendant dix ans. Les rapports sont num\u00e9rot\u00e9s dans l'ordre chronologique. Chaque direction transmet ses observations au secr\u00e9tariat. Le registre est mis \u00e0 jour au moins une fois par trimestre.",
+    "claim": "Le secr\u00e9tariat conserve les archives pendant dix ans.",
+    "expected": "SUPPORTED",
+    "support_scope": "single",
+    "category": "direct"
+  },
+  {
+    "id": "MH03",
+    "context": "Dans le pr\u00e9sent r\u00e8glement, l'Autorit\u00e9 comp\u00e9tente d\u00e9signe le ministre charg\u00e9 des finances. L'Autorit\u00e9 comp\u00e9tente approuve le plan annuel de contr\u00f4le. Le secr\u00e9tariat conserve les archives pendant dix ans. Les rapports sont num\u00e9rot\u00e9s dans l'ordre chronologique. Chaque direction transmet ses observations au secr\u00e9tariat. Le registre est mis \u00e0 jour au moins une fois par trimestre.",
+    "claim": "Le directeur g\u00e9n\u00e9ral est l'Autorit\u00e9 comp\u00e9tente.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "entity_swap"
+  },
+  {
+    "id": "MH04",
+    "context": "Dans le pr\u00e9sent r\u00e8glement, l'Autorit\u00e9 comp\u00e9tente d\u00e9signe le ministre charg\u00e9 des finances. L'Autorit\u00e9 comp\u00e9tente approuve le plan annuel de contr\u00f4le. Le secr\u00e9tariat conserve les archives pendant dix ans. Les rapports sont num\u00e9rot\u00e9s dans l'ordre chronologique. Chaque direction transmet ses observations au secr\u00e9tariat. Le registre est mis \u00e0 jour au moins une fois par trimestre.",
+    "claim": "Le ministre charg\u00e9 des finances ne participe jamais \u00e0 l'approbation du plan annuel.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "negation"
+  },
+  {
+    "id": "MH05",
+    "context": "Les contrats d'une valeur sup\u00e9rieure \u00e0 dix millions d'euros sont soumis \u00e0 un examen pr\u00e9alable. Cette exigence ne s'applique pas aux achats effectu\u00e9s dans une situation d'urgence officiellement d\u00e9clar\u00e9e. L'unit\u00e9 des achats conserve une copie de chaque contrat. Les fournisseurs sont inform\u00e9s par voie \u00e9lectronique. Le rapport annuel distingue les biens, les travaux et les services. Les dossiers clos sont archiv\u00e9s selon le calendrier institutionnel.",
+    "claim": "Un contrat ordinaire de douze millions d'euros est soumis \u00e0 un examen pr\u00e9alable.",
+    "expected": "SUPPORTED",
+    "support_scope": "single",
+    "category": "threshold"
+  },
+  {
+    "id": "MH06",
+    "context": "Les contrats d'une valeur sup\u00e9rieure \u00e0 dix millions d'euros sont soumis \u00e0 un examen pr\u00e9alable. Cette exigence ne s'applique pas aux achats effectu\u00e9s dans une situation d'urgence officiellement d\u00e9clar\u00e9e. L'unit\u00e9 des achats conserve une copie de chaque contrat. Les fournisseurs sont inform\u00e9s par voie \u00e9lectronique. Le rapport annuel distingue les biens, les travaux et les services. Les dossiers clos sont archiv\u00e9s selon le calendrier institutionnel.",
+    "claim": "Un achat de douze millions d'euros effectu\u00e9 dans une situation d'urgence officiellement d\u00e9clar\u00e9e n'est pas soumis \u00e0 l'examen pr\u00e9alable.",
+    "expected": "SUPPORTED",
+    "support_scope": "pair",
+    "category": "exception"
+  },
+  {
+    "id": "MH07",
+    "context": "Les contrats d'une valeur sup\u00e9rieure \u00e0 dix millions d'euros sont soumis \u00e0 un examen pr\u00e9alable. Cette exigence ne s'applique pas aux achats effectu\u00e9s dans une situation d'urgence officiellement d\u00e9clar\u00e9e. L'unit\u00e9 des achats conserve une copie de chaque contrat. Les fournisseurs sont inform\u00e9s par voie \u00e9lectronique. Le rapport annuel distingue les biens, les travaux et les services. Les dossiers clos sont archiv\u00e9s selon le calendrier institutionnel.",
+    "claim": "Tous les contrats de moins de dix millions d'euros doivent subir un examen pr\u00e9alable.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "numeric_reversal"
+  },
+  {
+    "id": "MH08",
+    "context": "Les contrats d'une valeur sup\u00e9rieure \u00e0 dix millions d'euros sont soumis \u00e0 un examen pr\u00e9alable. Cette exigence ne s'applique pas aux achats effectu\u00e9s dans une situation d'urgence officiellement d\u00e9clar\u00e9e. L'unit\u00e9 des achats conserve une copie de chaque contrat. Les fournisseurs sont inform\u00e9s par voie \u00e9lectronique. Le rapport annuel distingue les biens, les travaux et les services. Les dossiers clos sont archiv\u00e9s selon le calendrier institutionnel.",
+    "claim": "L'urgence peut \u00eatre d\u00e9clar\u00e9e librement par n'importe quel fournisseur.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "exception_invention"
+  },
+  {
+    "id": "MH09",
+    "context": "Le Comit\u00e9 de recours re\u00e7oit les contestations introduites contre une d\u00e9cision de passation de march\u00e9. Il statue dans un d\u00e9lai de quinze jours \u00e0 compter de leur r\u00e9ception. Le secr\u00e9tariat enregistre la date de chaque recours. Une copie de la d\u00e9cision est transmise aux parties. Les audiences peuvent se tenir \u00e0 distance. Le registre des recours est conserv\u00e9 pendant cinq ans.",
+    "claim": "Le Comit\u00e9 de recours statue sur les contestations dans un d\u00e9lai de quinze jours.",
+    "expected": "SUPPORTED",
+    "support_scope": "pair",
+    "category": "anaphora"
+  },
+  {
+    "id": "MH10",
+    "context": "Le Comit\u00e9 de recours re\u00e7oit les contestations introduites contre une d\u00e9cision de passation de march\u00e9. Il statue dans un d\u00e9lai de quinze jours \u00e0 compter de leur r\u00e9ception. Le secr\u00e9tariat enregistre la date de chaque recours. Une copie de la d\u00e9cision est transmise aux parties. Les audiences peuvent se tenir \u00e0 distance. Le registre des recours est conserv\u00e9 pendant cinq ans.",
+    "claim": "Le registre des recours est conserv\u00e9 pendant cinq ans.",
+    "expected": "SUPPORTED",
+    "support_scope": "single",
+    "category": "direct"
+  },
+  {
+    "id": "MH11",
+    "context": "Le Comit\u00e9 de recours re\u00e7oit les contestations introduites contre une d\u00e9cision de passation de march\u00e9. Il statue dans un d\u00e9lai de quinze jours \u00e0 compter de leur r\u00e9ception. Le secr\u00e9tariat enregistre la date de chaque recours. Une copie de la d\u00e9cision est transmise aux parties. Les audiences peuvent se tenir \u00e0 distance. Le registre des recours est conserv\u00e9 pendant cinq ans.",
+    "claim": "Le Comit\u00e9 de recours dispose de trente jours pour statuer.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "number_change"
+  },
+  {
+    "id": "MH12",
+    "context": "Le Comit\u00e9 de recours re\u00e7oit les contestations introduites contre une d\u00e9cision de passation de march\u00e9. Il statue dans un d\u00e9lai de quinze jours \u00e0 compter de leur r\u00e9ception. Le secr\u00e9tariat enregistre la date de chaque recours. Une copie de la d\u00e9cision est transmise aux parties. Les audiences peuvent se tenir \u00e0 distance. Le registre des recours est conserv\u00e9 pendant cinq ans.",
+    "claim": "Seul le secr\u00e9tariat peut statuer sur une contestation.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "role_reversal"
+  },
+  {
+    "id": "MH13",
+    "context": "Le sigle SPMPD d\u00e9signe la Strat\u00e9gie de Passation des March\u00e9s pour Promouvoir le D\u00e9veloppement. Le SPMPD est examin\u00e9 et approuv\u00e9 par la Banque avant le lancement des principales activit\u00e9s de passation des march\u00e9s. L'Emprunteur conserve la version approuv\u00e9e. Les modifications importantes sont document\u00e9es. Le plan de passation des march\u00e9s est mis \u00e0 jour r\u00e9guli\u00e8rement. Les documents ant\u00e9rieurs demeurent accessibles aux auditeurs.",
+    "claim": "La Strat\u00e9gie de Passation des March\u00e9s pour Promouvoir le D\u00e9veloppement est examin\u00e9e et approuv\u00e9e par la Banque.",
+    "expected": "SUPPORTED",
+    "support_scope": "pair",
+    "category": "definition"
+  },
+  {
+    "id": "MH14",
+    "context": "Le sigle SPMPD d\u00e9signe la Strat\u00e9gie de Passation des March\u00e9s pour Promouvoir le D\u00e9veloppement. Le SPMPD est examin\u00e9 et approuv\u00e9 par la Banque avant le lancement des principales activit\u00e9s de passation des march\u00e9s. L'Emprunteur conserve la version approuv\u00e9e. Les modifications importantes sont document\u00e9es. Le plan de passation des march\u00e9s est mis \u00e0 jour r\u00e9guli\u00e8rement. Les documents ant\u00e9rieurs demeurent accessibles aux auditeurs.",
+    "claim": "Les modifications importantes sont document\u00e9es.",
+    "expected": "SUPPORTED",
+    "support_scope": "single",
+    "category": "direct"
+  },
+  {
+    "id": "MH15",
+    "context": "Le sigle SPMPD d\u00e9signe la Strat\u00e9gie de Passation des March\u00e9s pour Promouvoir le D\u00e9veloppement. Le SPMPD est examin\u00e9 et approuv\u00e9 par la Banque avant le lancement des principales activit\u00e9s de passation des march\u00e9s. L'Emprunteur conserve la version approuv\u00e9e. Les modifications importantes sont document\u00e9es. Le plan de passation des march\u00e9s est mis \u00e0 jour r\u00e9guli\u00e8rement. Les documents ant\u00e9rieurs demeurent accessibles aux auditeurs.",
+    "claim": "Le SPMPD est approuv\u00e9 uniquement apr\u00e8s l'ach\u00e8vement de toutes les activit\u00e9s de passation des march\u00e9s.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "temporal_reversal"
+  },
+  {
+    "id": "MH16",
+    "context": "Le sigle SPMPD d\u00e9signe la Strat\u00e9gie de Passation des March\u00e9s pour Promouvoir le D\u00e9veloppement. Le SPMPD est examin\u00e9 et approuv\u00e9 par la Banque avant le lancement des principales activit\u00e9s de passation des march\u00e9s. L'Emprunteur conserve la version approuv\u00e9e. Les modifications importantes sont document\u00e9es. Le plan de passation des march\u00e9s est mis \u00e0 jour r\u00e9guli\u00e8rement. Les documents ant\u00e9rieurs demeurent accessibles aux auditeurs.",
+    "claim": "Le SPMPD est automatiquement supprim\u00e9 apr\u00e8s son approbation.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "unsupported_addition"
+  },
+  {
+    "id": "MH17",
+    "context": "Tout agent soumis au dispositif doit remettre une d\u00e9claration annuelle d'int\u00e9r\u00eats. Cette obligation est suspendue pendant un cong\u00e9 sans solde d'une dur\u00e9e sup\u00e9rieure \u00e0 six mois. Le service des ressources humaines tient le registre des cong\u00e9s. Les d\u00e9clarations sont conserv\u00e9es de mani\u00e8re confidentielle. L'agent signale toute modification substantielle de sa situation. Les formulaires sont disponibles sur l'intranet institutionnel.",
+    "claim": "Un agent soumis au dispositif doit normalement remettre une d\u00e9claration annuelle d'int\u00e9r\u00eats.",
+    "expected": "SUPPORTED",
+    "support_scope": "single",
+    "category": "general_rule"
+  },
+  {
+    "id": "MH18",
+    "context": "Tout agent soumis au dispositif doit remettre une d\u00e9claration annuelle d'int\u00e9r\u00eats. Cette obligation est suspendue pendant un cong\u00e9 sans solde d'une dur\u00e9e sup\u00e9rieure \u00e0 six mois. Le service des ressources humaines tient le registre des cong\u00e9s. Les d\u00e9clarations sont conserv\u00e9es de mani\u00e8re confidentielle. L'agent signale toute modification substantielle de sa situation. Les formulaires sont disponibles sur l'intranet institutionnel.",
+    "claim": "Un agent en cong\u00e9 sans solde pendant huit mois voit son obligation de d\u00e9claration annuelle suspendue.",
+    "expected": "SUPPORTED",
+    "support_scope": "pair",
+    "category": "exception"
+  },
+  {
+    "id": "MH19",
+    "context": "Tout agent soumis au dispositif doit remettre une d\u00e9claration annuelle d'int\u00e9r\u00eats. Cette obligation est suspendue pendant un cong\u00e9 sans solde d'une dur\u00e9e sup\u00e9rieure \u00e0 six mois. Le service des ressources humaines tient le registre des cong\u00e9s. Les d\u00e9clarations sont conserv\u00e9es de mani\u00e8re confidentielle. L'agent signale toute modification substantielle de sa situation. Les formulaires sont disponibles sur l'intranet institutionnel.",
+    "claim": "Tout cong\u00e9 sans solde, quelle que soit sa dur\u00e9e, suspend automatiquement l'obligation de d\u00e9claration.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "overclaim"
+  },
+  {
+    "id": "MH20",
+    "context": "Tout agent soumis au dispositif doit remettre une d\u00e9claration annuelle d'int\u00e9r\u00eats. Cette obligation est suspendue pendant un cong\u00e9 sans solde d'une dur\u00e9e sup\u00e9rieure \u00e0 six mois. Le service des ressources humaines tient le registre des cong\u00e9s. Les d\u00e9clarations sont conserv\u00e9es de mani\u00e8re confidentielle. L'agent signale toute modification substantielle de sa situation. Les formulaires sont disponibles sur l'intranet institutionnel.",
+    "claim": "Les d\u00e9clarations d'int\u00e9r\u00eats sont publiques et librement accessibles.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "polarity"
+  },
+  {
+    "id": "MH21",
+    "context": "La cat\u00e9gorie A d\u00e9signe les communes comptant plus de cinq cent mille habitants. Les communes de cat\u00e9gorie A doivent publier un rapport financier chaque trimestre. Le rapport est transmis au service central sous format \u00e9lectronique. Les donn\u00e9es personnelles sont anonymis\u00e9es avant publication. Une copie est conserv\u00e9e dans les archives municipales. Le service central publie une synth\u00e8se annuelle.",
+    "claim": "Une commune de six cent mille habitants doit publier un rapport financier chaque trimestre.",
+    "expected": "SUPPORTED",
+    "support_scope": "pair",
+    "category": "definition"
+  },
+  {
+    "id": "MH22",
+    "context": "La cat\u00e9gorie A d\u00e9signe les communes comptant plus de cinq cent mille habitants. Les communes de cat\u00e9gorie A doivent publier un rapport financier chaque trimestre. Le rapport est transmis au service central sous format \u00e9lectronique. Les donn\u00e9es personnelles sont anonymis\u00e9es avant publication. Une copie est conserv\u00e9e dans les archives municipales. Le service central publie une synth\u00e8se annuelle.",
+    "claim": "Les donn\u00e9es personnelles sont anonymis\u00e9es avant publication.",
+    "expected": "SUPPORTED",
+    "support_scope": "single",
+    "category": "direct"
+  },
+  {
+    "id": "MH23",
+    "context": "La cat\u00e9gorie A d\u00e9signe les communes comptant plus de cinq cent mille habitants. Les communes de cat\u00e9gorie A doivent publier un rapport financier chaque trimestre. Le rapport est transmis au service central sous format \u00e9lectronique. Les donn\u00e9es personnelles sont anonymis\u00e9es avant publication. Une copie est conserv\u00e9e dans les archives municipales. Le service central publie une synth\u00e8se annuelle.",
+    "claim": "Une commune de quatre cent mille habitants appartient n\u00e9cessairement \u00e0 la cat\u00e9gorie A.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "numeric_reversal"
+  },
+  {
+    "id": "MH24",
+    "context": "La cat\u00e9gorie A d\u00e9signe les communes comptant plus de cinq cent mille habitants. Les communes de cat\u00e9gorie A doivent publier un rapport financier chaque trimestre. Le rapport est transmis au service central sous format \u00e9lectronique. Les donn\u00e9es personnelles sont anonymis\u00e9es avant publication. Une copie est conserv\u00e9e dans les archives municipales. Le service central publie une synth\u00e8se annuelle.",
+    "claim": "Les communes de cat\u00e9gorie A ne publient qu'un seul rapport financier par an.",
+    "expected": "NOT_SUPPORTED",
+    "support_scope": "none",
+    "category": "frequency_reversal"
+  }
+]

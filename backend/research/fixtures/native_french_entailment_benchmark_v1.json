@@ -1,0 +1,98 @@
+[
+  {
+    "id": "F01",
+    "expected": "SUPPORTED",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque conform\u00e9ment au pr\u00e9sent R\u00e8glement de Passation des March\u00e9s.",
+    "claim": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque."
+  },
+  {
+    "id": "F02",
+    "expected": "CONTRADICTED",
+    "premise": "L'Emprunteur est responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es par la Banque conform\u00e9ment au pr\u00e9sent R\u00e8glement de Passation des March\u00e9s.",
+    "claim": "La Banque est seule responsable de la conduite des activit\u00e9s de passation des march\u00e9s financ\u00e9es."
+  },
+  {
+    "id": "F03",
+    "expected": "SUPPORTED",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "L'assistance de la Banque ne remplace pas l'Emprunteur dans l'ex\u00e9cution des op\u00e9rations de passation des march\u00e9s."
+  },
+  {
+    "id": "F04",
+    "expected": "OVERCLAIM",
+    "premise": "La Banque d\u00e9termine, au cas par cas, le champ et la nature de cet appui. Celui-ci ne l'am\u00e8ne pas \u00e0 ex\u00e9cuter les op\u00e9rations de passation des march\u00e9s en lieu et place de l'Emprunteur, qui reste responsable de l'ex\u00e9cution du projet.",
+    "claim": "La Banque n'apporte jamais aucune assistance \u00e0 l'Emprunteur pour la passation des march\u00e9s."
+  },
+  {
+    "id": "F05",
+    "expected": "SUPPORTED",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "Un syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat doit notamment pr\u00e9senter des garanties d'accessibilit\u00e9, de s\u00e9curit\u00e9, d'int\u00e9grit\u00e9 et de confidentialit\u00e9."
+  },
+  {
+    "id": "F06",
+    "expected": "OVERCLAIM",
+    "premise": "La Banque juge le syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat, notamment par son accessibilit\u00e9, sa s\u00e9curit\u00e9 et son int\u00e9grit\u00e9, sa confidentialit\u00e9 et ses caract\u00e9ristiques de contr\u00f4le et de suivi des op\u00e9rations.",
+    "claim": "La seule condition permettant de consid\u00e9rer un syst\u00e8me de d\u00e9mat\u00e9rialisation ad\u00e9quat est sa s\u00e9curit\u00e9."
+  },
+  {
+    "id": "F07",
+    "expected": "SUPPORTED",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur.",
+    "claim": "L'Emprunteur peut \u00e9tablir les documents de passation des march\u00e9s en fran\u00e7ais."
+  },
+  {
+    "id": "F08",
+    "expected": "CONTRADICTED",
+    "premise": "Les documents de Passation des March\u00e9s sont \u00e9tablis soit en anglais, espagnol ou fran\u00e7ais, \u00e0 la discr\u00e9tion de l'Emprunteur.",
+    "claim": "Les documents de passation des march\u00e9s doivent obligatoirement \u00eatre r\u00e9dig\u00e9s uniquement en anglais."
+  },
+  {
+    "id": "F09",
+    "expected": "SUPPORTED",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Une proposition re\u00e7ue hors d\u00e9lai est rejet\u00e9e."
+  },
+  {
+    "id": "F10",
+    "expected": "CONTRADICTED",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Une offre re\u00e7ue apr\u00e8s le d\u00e9lai doit \u00eatre accept\u00e9e."
+  },
+  {
+    "id": "F11",
+    "expected": "OVERCLAIM",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Toutes les offres sont automatiquement rejet\u00e9es."
+  },
+  {
+    "id": "F12",
+    "expected": "UNSUPPORTED",
+    "premise": "Les Offres/Propositions re\u00e7ues hors d\u00e9lai sont rejet\u00e9es.",
+    "claim": "Toute offre rejet\u00e9e entra\u00eene une amende de 500 000 francs suisses."
+  },
+  {
+    "id": "F13",
+    "expected": "SUPPORTED",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat.",
+    "claim": "La Banque examine et approuve le Plan de Passation des March\u00e9s avant la fin des n\u00e9gociations du pr\u00eat."
+  },
+  {
+    "id": "F14",
+    "expected": "CONTRADICTED",
+    "premise": "L'Emprunteur doit pr\u00e9parer le Plan de Passation des March\u00e9s avant les n\u00e9gociations du pr\u00eat, et la Banque l'examine et l'approuve avant l'ach\u00e8vement des n\u00e9gociations du pr\u00eat.",
+    "claim": "Le Plan de Passation des March\u00e9s n'est examin\u00e9 qu'apr\u00e8s l'ach\u00e8vement des n\u00e9gociations du pr\u00eat."
+  },
+  {
+    "id": "F15",
+    "expected": "OVERCLAIM",
+    "premise": "Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "Tous les Plans de Passation des March\u00e9s doivent toujours couvrir exactement dix-huit mois."
+  },
+  {
+    "id": "F16",
+    "expected": "UNSUPPORTED",
+    "premise": "Le Plan de Passation des March\u00e9s initial doit couvrir normalement au moins les dix-huit premiers mois de la mise en \u0153uvre du projet.",
+    "claim": "Le Plan de Passation des March\u00e9s co\u00fbte douze millions de dollars par an."
+  }
+]

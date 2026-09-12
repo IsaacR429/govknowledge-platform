@@ -1,0 +1,82 @@
+[
+  {
+    "id": "E01",
+    "label": "SUPPORTED",
+    "claim": "Le Conseil de securite a la responsabilite principale du maintien de la paix et de la securite internationales."
+  },
+  {
+    "id": "E02",
+    "label": "CONTRADICTED",
+    "claim": "L'Assemblee generale a la responsabilite principale du maintien de la paix et de la securite internationales."
+  },
+  {
+    "id": "E03",
+    "label": "OVERCLAIM",
+    "claim": "Le Conseil de securite commande directement toutes les armees nationales."
+  },
+  {
+    "id": "E04",
+    "label": "SUPPORTED",
+    "claim": "Le Secretaire general est nomme par l'Assemblee generale sur recommandation du Conseil de securite."
+  },
+  {
+    "id": "E05",
+    "label": "CONTRADICTED",
+    "claim": "Le Secretaire general est nomme uniquement par le Conseil de securite."
+  },
+  {
+    "id": "E06",
+    "label": "UNSUPPORTED",
+    "claim": "Le mandat du Secretaire general dure exactement dix ans."
+  },
+  {
+    "id": "E07",
+    "label": "SUPPORTED",
+    "claim": "Un membre peut etre expulse par l'Assemblee generale sur recommandation du Conseil de securite."
+  },
+  {
+    "id": "E08",
+    "label": "CONTRADICTED",
+    "claim": "Le Secretaire general peut expulser seul un Etat membre."
+  },
+  {
+    "id": "E09",
+    "label": "SUPPORTED",
+    "claim": "La Cour internationale de Justice est l'organe judiciaire principal des Nations Unies."
+  },
+  {
+    "id": "E10",
+    "label": "OVERCLAIM",
+    "claim": "La Cour internationale de Justice peut annuler toute loi nationale."
+  },
+  {
+    "id": "E11",
+    "label": "SUPPORTED",
+    "claim": "Les decisions de l'Assemblee generale sur les questions importantes exigent une majorite des deux tiers des membres presents et votants."
+  },
+  {
+    "id": "E12",
+    "label": "OVERCLAIM",
+    "claim": "Toutes les decisions de l'Assemblee generale exigent toujours une majorite des deux tiers."
+  },
+  {
+    "id": "E13",
+    "label": "SUPPORTED",
+    "claim": "La Charte preserve le droit inherent de legitime defense individuelle ou collective en cas d'attaque armee."
+  },
+  {
+    "id": "E14",
+    "label": "OVERCLAIM",
+    "claim": "L'Article 51 autorise automatiquement toute guerre preventive."
+  },
+  {
+    "id": "E15",
+    "label": "UNSUPPORTED",
+    "claim": "Chaque juge de la Cour internationale de Justice gagne actuellement 500000 francs suisses par an."
+  },
+  {
+    "id": "E16",
+    "label": "UNSUPPORTED",
+    "claim": "Le Conseil de securite dispose actuellement d'un budget annuel de douze milliards de dollars."
+  }
+]
