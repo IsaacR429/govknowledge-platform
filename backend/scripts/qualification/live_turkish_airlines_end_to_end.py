@@ -120,6 +120,7 @@ SUPPORTED_CLAIMS = (
             "If checked baggage is damaged, notice must be given "
             "within seven days following receipt of the baggage."
         ),
+        language="en",
         required=True,
     ),
     AtomicClaim(
@@ -128,6 +129,7 @@ SUPPORTED_CLAIMS = (
             "In case of delay, notice must be given within "
             "twenty-one days following delivery of the checked baggage."
         ),
+        language="en",
         required=True,
     ),
     AtomicClaim(
@@ -137,6 +139,7 @@ SUPPORTED_CLAIMS = (
             "two years, otherwise the right to actions and claims for "
             "loss and damage is extinguished."
         ),
+        language="en",
         required=True,
     ),
 )
@@ -147,6 +150,7 @@ UNSUPPORTED_CLAIM = AtomicClaim(
         "Turkish Airlines guarantees every passenger a complimentary "
         "hotel stay whenever any flight is delayed."
     ),
+    language="en",
     required=True,
 )
 

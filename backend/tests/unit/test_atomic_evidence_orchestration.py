@@ -36,6 +36,7 @@ def chunk(
     *,
     text: str,
     index: int,
+    language: str = "fr",
 ) -> RetrievedChunk:
     return RetrievedChunk(
         chunk_id=uuid4(),
@@ -46,7 +47,7 @@ def chunk(
         chunk_index=index,
         content=text,
         section_title=None,
-        language="fr",
+        language=language,
         score=0.85,
     )
 
@@ -967,3 +968,70 @@ def test_final_audit_failure_blocks_result_return():
 
     assert len(search.calls) == 1
     assert len(verifier.calls) == 1
+
+
+def test_cross_language_evidence_is_not_sent_to_nli():
+    claim_text = "Claim A"
+
+    french_evidence = chunk(
+        text="Preuve francaise.",
+        index=0,
+        language="fr",
+    )
+
+    english_evidence = chunk(
+        text="English evidence.",
+        index=1,
+        language="en",
+    )
+
+    search = FakeAuthorizedSearch(
+        results_by_query={
+            claim_text: (
+                english_evidence,
+                french_evidence,
+            )
+        }
+    )
+
+    verifier = FakeEntailmentVerifier(
+        labels_by_claim={
+            claim_text: (
+                EntailmentLabel.ENTAILMENT,
+            )
+        }
+    )
+
+    result = service(
+        search=search,
+        verifier=verifier,
+    ).evaluate(
+        identity=current_identity(),
+        claims=(
+            AtomicClaim(
+                claim_id="A",
+                text=claim_text,
+                language="fr",
+            ),
+        ),
+    )
+
+    assert result.is_sufficient
+
+    assert len(verifier.calls) == 1
+
+    _, premises = verifier.calls[0]
+
+    assert premises == (
+        "Preuve francaise.",
+    )
+
+    assert (
+        result
+        .claim_results[0]
+        .retrieved_evidence
+        == (
+            english_evidence,
+            french_evidence,
+        )
+    )

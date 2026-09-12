@@ -101,6 +101,7 @@ OXFAM_CLAIM = AtomicClaim(
         "informed by and managed to a set "
         "of clear principles."
     ),
+    language="en",
     required=True,
 )
 
@@ -111,6 +112,7 @@ UNICEF_CLAIM = AtomicClaim(
         "EMOPS recommande une allocation "
         "de 5 750 000 dollars."
     ),
+    language="fr",
     required=True,
 )
 

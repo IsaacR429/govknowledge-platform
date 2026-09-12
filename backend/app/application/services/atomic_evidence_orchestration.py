@@ -38,6 +38,7 @@ from app.domain.enums.audit import (
 class AtomicClaim:
     claim_id: str
     text: str
+    language: str = "fr"
     required: bool = True
 
     def __post_init__(self) -> None:
@@ -49,6 +50,11 @@ class AtomicClaim:
         if not self.text.strip():
             raise ValueError(
                 "Atomic claim text cannot be empty."
+            )
+
+        if not self.language.strip():
+            raise ValueError(
+                "Atomic claim language cannot be empty."
             )
 
 
@@ -195,13 +201,33 @@ class AtomicEvidenceOrchestrationService:
                 )
             )
 
-            # Only authorized retrieval results
-            # may enter NLI.
+            # Retrieval may be multilingual, but
+            # entailment verification is strictly
+            # same-language.
+            claim_language = (
+                claim.language
+                .strip()
+                .lower()
+            )
+
+            same_language_evidence = tuple(
+                item
+                for item in search_result.results
+                if (
+                    item.language
+                    .strip()
+                    .lower()
+                    == claim_language
+                )
+            )
+
+            # Only authorized, same-language
+            # retrieval results may enter NLI.
             verification = (
                 self._verification.verify(
                     claim=claim_text,
                     evidence=(
-                        search_result.results
+                        same_language_evidence
                     ),
                 )
             )

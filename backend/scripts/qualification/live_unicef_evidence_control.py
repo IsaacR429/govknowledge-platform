@@ -80,6 +80,7 @@ CLAIMS = (
             "EMOPS recommande une allocation de "
             "5 750 000 dollars."
         ),
+        language="fr",
         required=True,
     ),
     AtomicClaim(
@@ -88,6 +89,7 @@ CLAIMS = (
             "750 000 dollars de cette allocation "
             "sont affectés à la PEAS."
         ),
+        language="fr",
         required=True,
     ),
 )
