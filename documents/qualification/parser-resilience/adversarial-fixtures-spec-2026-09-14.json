@@ -1,0 +1,181 @@
+{
+  "spec_id": "govknowledge-parser-adversarial-fixtures-spec-2026-09-14",
+  "suite_id": "PARSER-RESILIENCE-REGRESSION-01",
+  "status": "SPEC_ONLY_NOT_GENERATED",
+
+  "source_corpus": {
+    "manifest": "govknowledge-parser-corpus-2026-09-14.json",
+    "manifest_sha256": "098e6eaa143bab2c0892cfd2c67626ff4eb10a4eb7d0f9be10a862859bd25ef1",
+    "physical_pdf_count": 24,
+    "unique_sha256_count": 6
+  },
+
+  "fixture_policy": {
+    "fixture_count": 7,
+    "generator_script": "backend/scripts/qualification/generate_parser_resilience_fixtures.py",
+    "generator_version": 1,
+    "randomness": "none",
+    "modify_generated_fixture_in_place": false,
+    "generated_hash_manifest": "adversarial-fixtures-manifest-2026-09-14.json",
+    "source_originals_are_immutable": true
+  },
+
+  "post_normalization_contract": {
+    "retry_limit": 1,
+    "normalized_page_count_must_equal_original_enumerated_page_count": true,
+    "every_page_mediabox_must_resolve": true,
+    "every_page_width_and_height_must_be_positive": true,
+    "first_page_content_identity_check_required": true,
+    "last_page_content_identity_check_required": true,
+    "normalization_may_never_replace_original": true
+  },
+
+  "fixtures": [
+    {
+      "fixture_id": "F01",
+      "filename": "carta_nu_deep_inherited_mediabox.pdf",
+      "construction_method": "BYTE_IDENTICAL_COPY_OF_LOCKED_SOURCE",
+      "source_sha256": "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8",
+      "expected_page_count": 34,
+      "purpose": "Regression fixture for page geometry inherited through a deeper PDF page-tree ancestor.",
+      "normalization_allowed": true,
+      "required_final_behavior": "SUCCESS_AFTER_AT_MOST_ONE_NORMALIZATION_RETRY",
+      "required_integrity_checks": [
+        "EXACT_PAGE_COUNT",
+        "ALL_MEDIABOX_RESOLVE",
+        "FIRST_PAGE_CONTENT_IDENTITY",
+        "LAST_PAGE_CONTENT_IDENTITY"
+      ]
+    },
+
+    {
+      "fixture_id": "F02",
+      "filename": "page_tree_count_mismatch.pdf",
+      "construction_method": "DETERMINISTIC_RAW_PDF_GENERATOR",
+      "expected_page_count": 3,
+      "purpose": "Three page leaves with deliberately incorrect internal /Pages /Count metadata.",
+      "normalization_allowed": true,
+      "required_final_behavior": "SUCCESS_DIRECT_OR_AFTER_AT_MOST_ONE_NORMALIZATION_RETRY",
+      "required_integrity_checks": [
+        "EXACT_PAGE_COUNT",
+        "PAGE_ORDER_PRESERVED",
+        "ALL_MEDIABOX_RESOLVE",
+        "FIRST_PAGE_CONTENT_IDENTITY",
+        "LAST_PAGE_CONTENT_IDENTITY"
+      ]
+    },
+
+    {
+      "fixture_id": "F03",
+      "filename": "page_tree_fragmented_parent_chain.pdf",
+      "construction_method": "DETERMINISTIC_RAW_PDF_GENERATOR",
+      "expected_page_count": 3,
+      "purpose": "Recoverable fragmented page tree with deliberately problematic parent-chain structure.",
+      "normalization_allowed": true,
+      "required_final_behavior": "SUCCESS_AFTER_AT_MOST_ONE_NORMALIZATION_RETRY_OR_CLEAN_FAILED",
+      "required_integrity_checks": [
+        "NO_SILENT_PAGE_LOSS",
+        "NO_PAGE_REORDERING_IF_SUCCESSFUL",
+        "NO_UNHANDLED_EXCEPTION",
+        "LINEAGE_ALWAYS_RECORDED"
+      ]
+    },
+
+    {
+      "fixture_id": "F04",
+      "filename": "rotated_pages_90_180_270.pdf",
+      "construction_method": "DETERMINISTIC_RAW_PDF_GENERATOR",
+      "expected_page_count": 4,
+      "purpose": "Control fixture containing unrotated, 90 degree, 180 degree and 270 degree page rotations.",
+      "normalization_allowed": false,
+      "required_final_behavior": "SUCCESS_DIRECT",
+      "required_integrity_checks": [
+        "EXACT_PAGE_COUNT",
+        "PAGE_ORDER_PRESERVED",
+        "ROTATION_PRESERVED",
+        "ALL_MEDIABOX_RESOLVE"
+      ]
+    },
+
+    {
+      "fixture_id": "F05",
+      "filename": "recoverable_damaged_xref.pdf",
+      "construction_method": "DETERMINISTIC_RAW_PDF_GENERATOR_WITH_POST_GENERATION_XREF_DAMAGE",
+      "expected_page_count": 3,
+      "purpose": "Recoverable cross-reference corruption while preserving page objects and page content.",
+      "normalization_allowed": true,
+      "required_final_behavior": "SUCCESS_AFTER_AT_MOST_ONE_NORMALIZATION_RETRY",
+      "required_integrity_checks": [
+        "EXACT_PAGE_COUNT",
+        "PAGE_ORDER_PRESERVED",
+        "FIRST_PAGE_CONTENT_IDENTITY",
+        "LAST_PAGE_CONTENT_IDENTITY"
+      ]
+    },
+
+    {
+      "fixture_id": "F06",
+      "filename": "ocr_only_scan.pdf",
+      "construction_method": "DETERMINISTIC_IMAGE_ONLY_PDF_GENERATOR",
+      "expected_page_count": 2,
+      "purpose": "Image-only pages with no embedded PDF text, forcing the OCR path.",
+      "normalization_allowed": false,
+      "required_final_behavior": "SUCCESS_DIRECT",
+      "required_integrity_checks": [
+        "EXACT_PAGE_COUNT",
+        "OCR_PATH_EXERCISED",
+        "PAGE_PROVENANCE_COMPLETE"
+      ]
+    },
+
+    {
+      "fixture_id": "F07",
+      "filename": "mixed_text_and_scan.pdf",
+      "construction_method": "DETERMINISTIC_MIXED_NATIVE_TEXT_AND_IMAGE_PDF_GENERATOR",
+      "expected_page_count": 4,
+      "purpose": "Alternating native-text and image-only pages to exercise mixed text/OCR handling.",
+      "normalization_allowed": false,
+      "required_final_behavior": "SUCCESS_DIRECT",
+      "required_integrity_checks": [
+        "EXACT_PAGE_COUNT",
+        "PAGE_ORDER_PRESERVED",
+        "NATIVE_TEXT_PATH_EXERCISED",
+        "OCR_PATH_EXERCISED",
+        "PAGE_PROVENANCE_COMPLETE"
+      ]
+    }
+  ],
+
+  "worker_control_tests": [
+    {
+      "control_id": "W01",
+      "purpose": "Verify hard timeout from the parent process.",
+      "method": "DETERMINISTIC_SLEEPING_TEST_WORKER",
+      "required_result": "PARENT_FORCIBLY_TERMINATES_WORKER_AND_CLASSIFIES_TIMEOUT"
+    },
+    {
+      "control_id": "W02",
+      "purpose": "Verify hard memory ceiling independent of parser cooperation.",
+      "method": "DETERMINISTIC_MEMORY_PRESSURE_TEST_WORKER",
+      "required_result": "WORKER_CANNOT_EXCEED_CONFIGURED_MEMORY_BOUND_WITHOUT_TERMINATION_OR_OOM_CLASSIFICATION"
+    }
+  ],
+
+  "suite_acceptance": {
+    "existing_physical_pdf_paths_accounted_for": 24,
+    "existing_unique_pdf_identities_accounted_for": 6,
+    "adversarial_fixture_cases_accounted_for": 7,
+    "physical_pdf_test_inputs_after_fixture_generation": 31,
+    "unhandled_exceptions_allowed": 0,
+    "server_process_crashes_allowed": 0,
+    "silent_page_count_changes_allowed": 0,
+    "recursive_normalization_retries_allowed": 0,
+    "lineage_required_for_every_input": true,
+    "allowed_terminal_statuses": [
+      "SUCCESS",
+      "FAILED"
+    ]
+  },
+
+  "stop_condition": "WHEN PARSER-RESILIENCE-REGRESSION-01 IS GREEN, PARSER ROBUSTNESS WORK STOPS AND LIVE EVIDENCE PROMPT-INJECTION QUALIFICATION RESUMES."
+}

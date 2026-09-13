@@ -1,0 +1,256 @@
+﻿{
+    "manifest_id":  "govknowledge-parser-corpus-2026-09-14",
+    "source_root":  "C:\\Users\\isaac\\govknowledge",
+    "physical_pdf_count":  24,
+    "unique_sha256_count":  6,
+    "qualification_policy":  {
+                                 "account_for_every_physical_pdf":  true,
+                                 "group_results_by_sha256":  true,
+                                 "silently_exclude_duplicates":  false,
+                                 "normalized_derivatives_are_source_documents":  false
+                             },
+    "unique_documents":  [
+                             {
+                                 "sha256":  "070a6536d93d87c9e30f1a5b26db9b1c0519f55c47ee58dda60463ad1b8de1ee",
+                                 "size_bytes":  688920,
+                                 "file_name":  "unicef-emergency-procedures-fr.pdf",
+                                 "physical_copy_count":  2,
+                                 "paths":  [
+                                               "backend\\data\\documents\\ba4f8e8c-f165-4940-9148-611fb488b653\\7326d7cb-2fad-400c-84aa-526073914849\\unicef-emergency-procedures-fr.pdf",
+                                               "documents\\qualification\\unicef-emergency-procedures-fr.pdf"
+                                           ]
+                             },
+                             {
+                                 "sha256":  "37ceb122b52dfaee7581f9abc3aed3c8ccd4f3e999ff38f98e0df2060eaab483",
+                                 "size_bytes":  2972588,
+                                 "file_name":  "test-policy.pdf",
+                                 "physical_copy_count":  2,
+                                 "paths":  [
+                                               "backend\\data\\documents\\53c3d353-d4a3-4e39-a54a-e9da19bd861e\\86aa0794-a065-4819-a4fe-01694fad6122\\test-policy.pdf",
+                                               "documents\\sample\\test-policy.pdf"
+                                           ]
+                             },
+                             {
+                                 "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5",
+                                 "size_bytes":  1893834,
+                                 "file_name":  "turkish-airlines-general-conditions.pdf",
+                                 "physical_copy_count":  11,
+                                 "paths":  [
+                                               "backend\\data\\documents\\240d3bee-8bdc-49e5-9010-95271ccabe4c\\b237bc65-8808-4c51-847d-bf291efeb5d3\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\3643d50d-f4f0-4ecd-90b4-90fd64e0c75e\\b90c21cb-8bdb-4bfe-88f2-f1f22d623bec\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\4bf5a5eb-ddf0-4f6c-900f-dba736b90cf2\\0fd6d63c-b845-4b70-b1aa-37429ed19ed4\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\6ad223e7-1ead-4080-8b56-324ed2947d9f\\11d4aff0-2a20-4412-a494-fb09a2d63e93\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\72feaa2e-657a-4817-bc87-8b9e08ba7ecc\\77d0a0b4-9956-4674-a0d8-13da1fae7326\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\8dda2f5e-d8be-414b-bb56-3800f9d93707\\99f0303b-112b-4ab2-96e6-6087fe2da1fc\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\996e0916-ed68-4a2c-bc75-62dcfc5cd7ac\\bfd0bef5-b3c5-4150-9f51-98c5ad124009\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\bdb955ad-40b6-4365-bc09-67c9adb6da50\\f5b76e02-7b3d-4e76-ad0d-bd7ff10042d7\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\e14a174d-35c4-4b02-836e-d5e44f919f68\\f3207b45-2810-4667-bb60-f280f65f42ab\\turkish-airlines-general-conditions.pdf",
+                                               "backend\\data\\documents\\e300987d-dc8c-4a2a-ad94-0ab23224938f\\2fdb5072-fbcf-4901-a243-69b959e7c080\\turkish-airlines-general-conditions.pdf",
+                                               "documents\\qualification\\turkish-airlines-general-conditions.pdf"
+                                           ]
+                             },
+                             {
+                                 "sha256":  "686d0736c3a80ef3e347f79fa698c72e52c6a3ea040d6dc064a18aa256e2743d",
+                                 "size_bytes":  2452605,
+                                 "file_name":  "oxfam-partnership-policy.pdf",
+                                 "physical_copy_count":  2,
+                                 "paths":  [
+                                               "backend\\data\\documents\\80895834-aced-41a9-91d5-5cf3108df0c1\\aa72bba0-2c28-4845-9b37-d747c3d94ff8\\oxfam-partnership-policy.pdf",
+                                               "documents\\qualification\\oxfam-partnership-policy.pdf"
+                                           ]
+                             },
+                             {
+                                 "sha256":  "b8ab23917232c3f29dc8b837155a83d3c76654ed58e09cb8edbae63ebbcffbfb",
+                                 "size_bytes":  31745747,
+                                 "file_name":  "world-bank-procurement-fr.pdf",
+                                 "physical_copy_count":  1,
+                                 "paths":  [
+                                               "documents\\sample\\world-bank-procurement-fr.pdf"
+                                           ]
+                             },
+                             {
+                                 "sha256":  "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8",
+                                 "size_bytes":  67715,
+                                 "file_name":  "Carta_NU.pdf",
+                                 "physical_copy_count":  6,
+                                 "paths":  [
+                                               "backend\\data\\documents\\10955150-2e47-44d8-af25-b6df8b45dc98\\2c018af9-dbbd-4e0f-9870-73ec6cf1a082\\Carta_NU.pdf",
+                                               "backend\\data\\documents\\4c2423d1-cbe4-4ea3-819f-90f3d59af5ec\\a387d197-fdcb-4115-a026-6a0e74981be0\\Carta_NU.pdf",
+                                               "backend\\data\\documents\\677343e5-8660-43fd-abcb-b5479ed3c60e\\f1e7a6e9-3836-42d0-995f-328cef1cf97c\\Carta_NU.pdf",
+                                               "backend\\data\\documents\\6e576d5c-34c0-4ef8-b7d5-e76c540758b5\\2d3dc174-e978-4151-b22e-f85a8f9ca786\\Carta_NU.pdf",
+                                               "backend\\data\\documents\\8186a6cd-dce5-432f-ae28-84887dba0fe5\\a893f0b1-04cb-4d8f-b884-e9f3048ea390\\Carta_NU.pdf",
+                                               "documents\\qualification\\Carta_NU.pdf"
+                                           ]
+                             }
+                         ],
+    "physical_files":  [
+                           {
+                               "file_name":  "unicef-emergency-procedures-fr.pdf",
+                               "relative_path":  "backend\\data\\documents\\ba4f8e8c-f165-4940-9148-611fb488b653\\7326d7cb-2fad-400c-84aa-526073914849\\unicef-emergency-procedures-fr.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\ba4f8e8c-f165-4940-9148-611fb488b653\\7326d7cb-2fad-400c-84aa-526073914849\\unicef-emergency-procedures-fr.pdf",
+                               "size_bytes":  688920,
+                               "sha256":  "070a6536d93d87c9e30f1a5b26db9b1c0519f55c47ee58dda60463ad1b8de1ee"
+                           },
+                           {
+                               "file_name":  "unicef-emergency-procedures-fr.pdf",
+                               "relative_path":  "documents\\qualification\\unicef-emergency-procedures-fr.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\documents\\qualification\\unicef-emergency-procedures-fr.pdf",
+                               "size_bytes":  688920,
+                               "sha256":  "070a6536d93d87c9e30f1a5b26db9b1c0519f55c47ee58dda60463ad1b8de1ee"
+                           },
+                           {
+                               "file_name":  "test-policy.pdf",
+                               "relative_path":  "backend\\data\\documents\\53c3d353-d4a3-4e39-a54a-e9da19bd861e\\86aa0794-a065-4819-a4fe-01694fad6122\\test-policy.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\53c3d353-d4a3-4e39-a54a-e9da19bd861e\\86aa0794-a065-4819-a4fe-01694fad6122\\test-policy.pdf",
+                               "size_bytes":  2972588,
+                               "sha256":  "37ceb122b52dfaee7581f9abc3aed3c8ccd4f3e999ff38f98e0df2060eaab483"
+                           },
+                           {
+                               "file_name":  "test-policy.pdf",
+                               "relative_path":  "documents\\sample\\test-policy.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\documents\\sample\\test-policy.pdf",
+                               "size_bytes":  2972588,
+                               "sha256":  "37ceb122b52dfaee7581f9abc3aed3c8ccd4f3e999ff38f98e0df2060eaab483"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\240d3bee-8bdc-49e5-9010-95271ccabe4c\\b237bc65-8808-4c51-847d-bf291efeb5d3\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\240d3bee-8bdc-49e5-9010-95271ccabe4c\\b237bc65-8808-4c51-847d-bf291efeb5d3\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\3643d50d-f4f0-4ecd-90b4-90fd64e0c75e\\b90c21cb-8bdb-4bfe-88f2-f1f22d623bec\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\3643d50d-f4f0-4ecd-90b4-90fd64e0c75e\\b90c21cb-8bdb-4bfe-88f2-f1f22d623bec\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\4bf5a5eb-ddf0-4f6c-900f-dba736b90cf2\\0fd6d63c-b845-4b70-b1aa-37429ed19ed4\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\4bf5a5eb-ddf0-4f6c-900f-dba736b90cf2\\0fd6d63c-b845-4b70-b1aa-37429ed19ed4\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\6ad223e7-1ead-4080-8b56-324ed2947d9f\\11d4aff0-2a20-4412-a494-fb09a2d63e93\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\6ad223e7-1ead-4080-8b56-324ed2947d9f\\11d4aff0-2a20-4412-a494-fb09a2d63e93\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\72feaa2e-657a-4817-bc87-8b9e08ba7ecc\\77d0a0b4-9956-4674-a0d8-13da1fae7326\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\72feaa2e-657a-4817-bc87-8b9e08ba7ecc\\77d0a0b4-9956-4674-a0d8-13da1fae7326\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\8dda2f5e-d8be-414b-bb56-3800f9d93707\\99f0303b-112b-4ab2-96e6-6087fe2da1fc\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\8dda2f5e-d8be-414b-bb56-3800f9d93707\\99f0303b-112b-4ab2-96e6-6087fe2da1fc\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\996e0916-ed68-4a2c-bc75-62dcfc5cd7ac\\bfd0bef5-b3c5-4150-9f51-98c5ad124009\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\996e0916-ed68-4a2c-bc75-62dcfc5cd7ac\\bfd0bef5-b3c5-4150-9f51-98c5ad124009\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\bdb955ad-40b6-4365-bc09-67c9adb6da50\\f5b76e02-7b3d-4e76-ad0d-bd7ff10042d7\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\bdb955ad-40b6-4365-bc09-67c9adb6da50\\f5b76e02-7b3d-4e76-ad0d-bd7ff10042d7\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\e14a174d-35c4-4b02-836e-d5e44f919f68\\f3207b45-2810-4667-bb60-f280f65f42ab\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\e14a174d-35c4-4b02-836e-d5e44f919f68\\f3207b45-2810-4667-bb60-f280f65f42ab\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "backend\\data\\documents\\e300987d-dc8c-4a2a-ad94-0ab23224938f\\2fdb5072-fbcf-4901-a243-69b959e7c080\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\e300987d-dc8c-4a2a-ad94-0ab23224938f\\2fdb5072-fbcf-4901-a243-69b959e7c080\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "turkish-airlines-general-conditions.pdf",
+                               "relative_path":  "documents\\qualification\\turkish-airlines-general-conditions.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\documents\\qualification\\turkish-airlines-general-conditions.pdf",
+                               "size_bytes":  1893834,
+                               "sha256":  "66e1abd4831ad6018ff8d58c94938e641b61fd7a062bd1c35ccaec6eda2883a5"
+                           },
+                           {
+                               "file_name":  "oxfam-partnership-policy.pdf",
+                               "relative_path":  "backend\\data\\documents\\80895834-aced-41a9-91d5-5cf3108df0c1\\aa72bba0-2c28-4845-9b37-d747c3d94ff8\\oxfam-partnership-policy.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\80895834-aced-41a9-91d5-5cf3108df0c1\\aa72bba0-2c28-4845-9b37-d747c3d94ff8\\oxfam-partnership-policy.pdf",
+                               "size_bytes":  2452605,
+                               "sha256":  "686d0736c3a80ef3e347f79fa698c72e52c6a3ea040d6dc064a18aa256e2743d"
+                           },
+                           {
+                               "file_name":  "oxfam-partnership-policy.pdf",
+                               "relative_path":  "documents\\qualification\\oxfam-partnership-policy.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\documents\\qualification\\oxfam-partnership-policy.pdf",
+                               "size_bytes":  2452605,
+                               "sha256":  "686d0736c3a80ef3e347f79fa698c72e52c6a3ea040d6dc064a18aa256e2743d"
+                           },
+                           {
+                               "file_name":  "world-bank-procurement-fr.pdf",
+                               "relative_path":  "documents\\sample\\world-bank-procurement-fr.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\documents\\sample\\world-bank-procurement-fr.pdf",
+                               "size_bytes":  31745747,
+                               "sha256":  "b8ab23917232c3f29dc8b837155a83d3c76654ed58e09cb8edbae63ebbcffbfb"
+                           },
+                           {
+                               "file_name":  "Carta_NU.pdf",
+                               "relative_path":  "backend\\data\\documents\\10955150-2e47-44d8-af25-b6df8b45dc98\\2c018af9-dbbd-4e0f-9870-73ec6cf1a082\\Carta_NU.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\10955150-2e47-44d8-af25-b6df8b45dc98\\2c018af9-dbbd-4e0f-9870-73ec6cf1a082\\Carta_NU.pdf",
+                               "size_bytes":  67715,
+                               "sha256":  "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8"
+                           },
+                           {
+                               "file_name":  "Carta_NU.pdf",
+                               "relative_path":  "backend\\data\\documents\\4c2423d1-cbe4-4ea3-819f-90f3d59af5ec\\a387d197-fdcb-4115-a026-6a0e74981be0\\Carta_NU.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\4c2423d1-cbe4-4ea3-819f-90f3d59af5ec\\a387d197-fdcb-4115-a026-6a0e74981be0\\Carta_NU.pdf",
+                               "size_bytes":  67715,
+                               "sha256":  "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8"
+                           },
+                           {
+                               "file_name":  "Carta_NU.pdf",
+                               "relative_path":  "backend\\data\\documents\\677343e5-8660-43fd-abcb-b5479ed3c60e\\f1e7a6e9-3836-42d0-995f-328cef1cf97c\\Carta_NU.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\677343e5-8660-43fd-abcb-b5479ed3c60e\\f1e7a6e9-3836-42d0-995f-328cef1cf97c\\Carta_NU.pdf",
+                               "size_bytes":  67715,
+                               "sha256":  "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8"
+                           },
+                           {
+                               "file_name":  "Carta_NU.pdf",
+                               "relative_path":  "backend\\data\\documents\\6e576d5c-34c0-4ef8-b7d5-e76c540758b5\\2d3dc174-e978-4151-b22e-f85a8f9ca786\\Carta_NU.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\6e576d5c-34c0-4ef8-b7d5-e76c540758b5\\2d3dc174-e978-4151-b22e-f85a8f9ca786\\Carta_NU.pdf",
+                               "size_bytes":  67715,
+                               "sha256":  "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8"
+                           },
+                           {
+                               "file_name":  "Carta_NU.pdf",
+                               "relative_path":  "backend\\data\\documents\\8186a6cd-dce5-432f-ae28-84887dba0fe5\\a893f0b1-04cb-4d8f-b884-e9f3048ea390\\Carta_NU.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\backend\\data\\documents\\8186a6cd-dce5-432f-ae28-84887dba0fe5\\a893f0b1-04cb-4d8f-b884-e9f3048ea390\\Carta_NU.pdf",
+                               "size_bytes":  67715,
+                               "sha256":  "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8"
+                           },
+                           {
+                               "file_name":  "Carta_NU.pdf",
+                               "relative_path":  "documents\\qualification\\Carta_NU.pdf",
+                               "full_path":  "C:\\Users\\isaac\\govknowledge\\documents\\qualification\\Carta_NU.pdf",
+                               "size_bytes":  67715,
+                               "sha256":  "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8"
+                           }
+                       ]
+}

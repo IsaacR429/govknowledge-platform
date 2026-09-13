@@ -26,7 +26,9 @@ logs/
 data/
 
 # Local qualification/source documents
-/documents/qualification/
+/documents/qualification/*
+!/documents/qualification/parser-resilience/
+!/documents/qualification/parser-resilience/**
 /documents/sample/world-bank-procurement-fr.pdf
 
 # Local qualification output
