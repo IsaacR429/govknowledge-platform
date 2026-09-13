@@ -6,6 +6,9 @@ from app.api.routes.authentication import (
 from app.api.routes.health import (
     router as health_router,
 )
+from app.api.routes.qa import (
+    router as qa_router,
+)
 from app.api.routes.source_pages import (
     router as source_pages_router,
 )
@@ -36,6 +39,11 @@ def create_app() -> FastAPI:
 
     application.include_router(
         source_pages_router,
+        prefix=settings.api_prefix,
+    )
+
+    application.include_router(
+        qa_router,
         prefix=settings.api_prefix,
     )
 

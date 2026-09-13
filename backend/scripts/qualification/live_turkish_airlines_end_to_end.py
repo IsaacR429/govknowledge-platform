@@ -5,9 +5,13 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import secrets
 import sys
 
+from pwdlib import PasswordHash
+
 from anthropic import Anthropic
+from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.application.services.question_answer import (
@@ -22,7 +26,12 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 from app.api.dependencies.llm import get_llm_provider
+from app.api.dependencies.qa import (
+    get_qa_embedding_provider,
+    get_qa_entailment_verifier,
+)
 from app.application.ports.identity_provider import CurrentIdentity
+from app.main import create_app
 from app.application.services.audit import AuditService
 from app.application.services.authorization import AuthorizationService
 from app.application.services.authorized_search import AuthorizedSearchService
@@ -59,6 +68,9 @@ from app.core.config import get_settings
 from app.domain.enums.permission import PermissionAction
 from app.domain.enums.processing import ProcessingStatus
 from app.infrastructure.database.models.audit import AuditEventRecord
+from app.infrastructure.database.models.authentication import (
+    LocalCredential,
+)
 from app.infrastructure.database.models.documents import (
     Document,
     DocumentChunk,
@@ -284,7 +296,7 @@ def main() -> None:
     print()
     print("Loading pinned multilingual E5 model...")
 
-    embedding_provider = SentenceTransformerEmbeddingProvider()
+    embedding_provider = get_qa_embedding_provider()
 
     assert embedding_provider.model_name == DEFAULT_MODEL_NAME
     assert embedding_provider.model_revision == DEFAULT_MODEL_REVISION
@@ -297,10 +309,8 @@ def main() -> None:
     print()
     print("Loading pinned mDeBERTa NLI model...")
 
-    entailment_verifier = MDebertaEntailmentVerifier(
-        model_name=NLI_MODEL,
-        model_revision=NLI_REVISION,
-        local_files_only=True,
+    entailment_verifier = (
+        get_qa_entailment_verifier()
     )
 
     print("NLI model:", NLI_MODEL)
@@ -538,6 +548,23 @@ def main() -> None:
 
         db.add(user)
         db.flush()
+
+        qualification_password = (
+            secrets.token_urlsafe(24)
+        )
+
+        password_hasher = (
+            PasswordHash.recommended()
+        )
+
+        credential = LocalCredential(
+            user_id=user.id,
+            password_hash=password_hasher.hash(
+                qualification_password
+            ),
+        )
+
+        db.add(credential)
 
         permission = DocumentPermission(
             user_id=user.id,
@@ -886,6 +913,253 @@ def main() -> None:
         print()
         print(
             "Natural-language question pipeline: PASS"
+        )
+
+        print()
+        print("=" * 78)
+        print(
+            "REAL AUTHENTICATED HTTP Q&A PIPELINE"
+        )
+        print("=" * 78)
+
+        http_app = create_app()
+
+        with TestClient(http_app) as client:
+            login_response = client.post(
+                (
+                    f"{settings.api_prefix}"
+                    "/auth/login"
+                ),
+                json={
+                    "username": username,
+                    "password": (
+                        qualification_password
+                    ),
+                },
+            )
+
+            assert (
+                login_response.status_code
+                == 200
+            )
+
+            login_body = (
+                login_response.json()
+            )
+
+            access_token = (
+                login_body["access_token"]
+            )
+
+            assert access_token
+
+            print(
+                "Real login: PASS"
+            )
+
+            headers = {
+                "Authorization": (
+                    f"Bearer {access_token}"
+                )
+            }
+
+            me_response = client.get(
+                (
+                    f"{settings.api_prefix}"
+                    "/me"
+                ),
+                headers=headers,
+            )
+
+            assert (
+                me_response.status_code
+                == 200
+            )
+
+            me_body = me_response.json()
+
+            assert (
+                me_body["username"]
+                == username
+            )
+
+            print(
+                "Bearer identity resolution: PASS"
+            )
+
+            qa_response = client.post(
+                (
+                    f"{settings.api_prefix}"
+                    "/qa"
+                ),
+                headers=headers,
+                json={
+                    "question": (
+                        natural_question
+                    ),
+                    "language": "fr",
+                },
+            )
+
+            assert (
+                qa_response.status_code
+                == 200
+            )
+
+            qa_body = qa_response.json()
+
+            print()
+            print(
+                "HTTP Q&A status:",
+                qa_body["status"],
+            )
+
+            print(
+                "HTTP Q&A answer:",
+                qa_body["answer"]
+                .encode("unicode_escape")
+                .decode(),
+            )
+
+            print(
+                "HTTP correlation ID:",
+                qa_body[
+                    "correlation_id"
+                ],
+            )
+
+            assert (
+                qa_body["status"]
+                == "SUPPORTED"
+            )
+
+            assert qa_body["answer"]
+
+            assert (
+                len(qa_body["citations"])
+                >= 1
+            )
+
+            http_citation = (
+                qa_body["citations"][0]
+            )
+
+            assert (
+                http_citation[
+                    "evidence_id"
+                ]
+                == "claim-1"
+            )
+
+            assert (
+                http_citation[
+                    "page_number"
+                ]
+                == 19
+            )
+
+            assert (
+                http_citation[
+                    "document_title"
+                ]
+                == (
+                    "Turkish Airlines General "
+                    "Conditions of Carriage of "
+                    "Passengers and Baggage"
+                )
+            )
+
+            assert (
+                http_citation[
+                    "issuing_organization"
+                ]
+                == "Turkish Airlines"
+            )
+
+            assert (
+                http_citation[
+                    "jurisdiction"
+                ]
+                == "International"
+            )
+
+            assert (
+                http_citation[
+                    "cited_text"
+                ]
+            )
+
+            # Internal retrieval / lineage details
+            # must not leak through the public API.
+            assert (
+                "chunk_id"
+                not in http_citation
+            )
+
+            assert (
+                "document_version_id"
+                not in http_citation
+            )
+
+            assert (
+                "start_char"
+                not in http_citation
+            )
+
+            assert (
+                "end_char"
+                not in http_citation
+            )
+
+            assert (
+                "score"
+                not in http_citation
+            )
+
+            print(
+                "HTTP citation contract: PASS"
+            )
+
+            logout_response = client.post(
+                (
+                    f"{settings.api_prefix}"
+                    "/auth/logout"
+                ),
+                headers=headers,
+            )
+
+            assert (
+                logout_response.status_code
+                == 204
+            )
+
+            rejected_after_logout = (
+                client.post(
+                    (
+                        f"{settings.api_prefix}"
+                        "/qa"
+                    ),
+                    headers=headers,
+                    json={
+                        "question": (
+                            natural_question
+                        ),
+                        "language": "fr",
+                    },
+                )
+            )
+
+            assert (
+                rejected_after_logout.status_code
+                == 401
+            )
+
+            print(
+                "Logout session revocation: PASS"
+            )
+
+        print(
+            "Authenticated HTTP Q&A pipeline: PASS"
         )
 
         answer_result = answer_service.generate(
