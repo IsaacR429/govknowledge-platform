@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from app.application.ports.audit import (
+    AuditEvent,
+)
 from app.application.ports.identity_provider import (
     CurrentIdentity,
 )
@@ -14,12 +17,19 @@ from app.application.services.atomic_evidence_orchestration import (
     AtomicClaim,
     AtomicEvidenceOrchestrationService,
 )
+from app.application.services.audit import (
+    AuditService,
+)
 from app.application.services.authorized_search import (
     AuthorizedSearchService,
 )
 from app.application.services.grounded_answer_generation import (
     GroundedAnswerGenerationService,
     GroundedAnswerResult,
+)
+from app.domain.enums.audit import (
+    AuditEventType,
+    AuditOutcome,
 )
 
 
@@ -40,6 +50,7 @@ class QuestionAnswerService:
         planner: QuestionClaimPlanner,
         evidence: AtomicEvidenceOrchestrationService,
         answer: GroundedAnswerGenerationService,
+        audit: AuditService,
         discovery_top_k: int = 10,
     ) -> None:
         if discovery_top_k < 1:
@@ -51,6 +62,7 @@ class QuestionAnswerService:
         self._planner = planner
         self._evidence = evidence
         self._answer = answer
+        self._audit = audit
         self._discovery_top_k = discovery_top_k
 
     def answer(
@@ -81,11 +93,32 @@ class QuestionAnswerService:
 
         # Authorization happens inside
         # AuthorizedSearchService before retrieval.
-        discovery = self._search.search(
-            identity=identity,
-            query=clean_question,
-            top_k=self._discovery_top_k,
-        )
+        try:
+            discovery = self._search.search(
+                identity=identity,
+                query=clean_question,
+                top_k=self._discovery_top_k,
+            )
+        except Exception:
+            self._audit.record(
+                AuditEvent(
+                    event_type=(
+                        AuditEventType.EVIDENCE_FAILED
+                    ),
+                    outcome=AuditOutcome.FAILED,
+                    actor_user_id=identity.user_id,
+                    resource_type="qa_evidence",
+                    correlation_id=correlation_id,
+                    error_code=(
+                        "EVIDENCE_DISCOVERY_FAILED"
+                    ),
+                    metadata={
+                        "stage": "authorized_discovery",
+                    },
+                )
+            )
+
+            raise
 
         # No authorized evidence means there is
         # nothing that may be planned or answered.

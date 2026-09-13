@@ -272,3 +272,47 @@ def test_unauthorized_page_uses_same_404():
             "Source page not found."
         )
     }
+
+
+def test_malformed_page_id_is_rejected_before_source_page_lookup():
+    service = FakeSourcePageService(
+        page=source_page()
+    )
+
+    client, _ = client_with(
+        service
+    )
+
+    response = client.get(
+        endpoint(
+            "definitely-not-a-uuid"
+        )
+    )
+
+    print(
+        "Malformed UUID HTTP status:",
+        response.status_code,
+    )
+
+    print(
+        "Malformed UUID response:",
+        response.text,
+    )
+
+    # FastAPI path-parameter validation rejects
+    # malformed UUIDs before the protected
+    # source-page business method executes.
+    assert response.status_code == 422
+
+    assert service.calls == []
+
+    response_text = response.text.lower()
+
+    # Validation details may describe the UUID
+    # problem, but must not expose server internals.
+    assert "traceback" not in response_text
+    assert "stack trace" not in response_text
+    assert "sqlalchemy" not in response_text
+    assert "postgres" not in response_text
+    assert "storage_path" not in response_text
+    assert "file_hash" not in response_text

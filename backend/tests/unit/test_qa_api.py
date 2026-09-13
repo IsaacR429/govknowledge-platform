@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import (
     TestClient,
 )
@@ -16,11 +18,20 @@ from app.api.dependencies.qa import (
 from app.application.ports.citation_presentation_repository import (
     CitationPresentation,
 )
+from app.application.services.authorization import (
+    AuthorizationService,
+)
+from app.application.services.authorized_search import (
+    AuthorizedSearchService,
+)
 from app.application.services.citation_mapping import (
     Citation,
 )
 from app.application.services.grounded_answer_generation import (
     GroundedAnswerResult,
+)
+from app.application.services.question_answer import (
+    QuestionAnswerService,
 )
 from app.application.services.validated_citations import (
     ClaimCitation,
@@ -93,6 +104,113 @@ class FakeCitationPresentationRepository:
                 document_id,
             )
         )
+
+
+class FailingAuthorizationRepository:
+    def document_ids_for_user(
+        self,
+        *,
+        user_id,
+        action,
+        active_only,
+    ):
+        raise RuntimeError(
+            "SECRET_DATABASE_HOST=db.internal "
+            "password=super-secret"
+        )
+
+    def has_document_permission(
+        self,
+        *,
+        user_id,
+        document_id,
+        action,
+    ):
+        raise AssertionError(
+            "Unexpected permission lookup."
+        )
+
+
+class NeverEmbeddingProvider:
+    def __init__(self):
+        self.calls = []
+
+    def embed_query(
+        self,
+        text,
+    ):
+        self.calls.append(text)
+        raise AssertionError(
+            "Embedding must not run."
+        )
+
+
+class NeverRetrieval:
+    def __init__(self):
+        self.calls = []
+
+    def search_authorized(
+        self,
+        **kwargs,
+    ):
+        self.calls.append(kwargs)
+        raise AssertionError(
+            "Retrieval must not run."
+        )
+
+
+class NeverPlanner:
+    def __init__(self):
+        self.calls = []
+
+    def plan(
+        self,
+        request,
+    ):
+        self.calls.append(request)
+        raise AssertionError(
+            "Planner must not run."
+        )
+
+
+class NeverEvidenceService:
+    def __init__(self):
+        self.calls = []
+
+    def evaluate(
+        self,
+        **kwargs,
+    ):
+        self.calls.append(kwargs)
+        raise AssertionError(
+            "Evidence evaluation must not run."
+        )
+
+
+class NeverAnswerService:
+    def __init__(self):
+        self.calls = []
+
+    def generate(
+        self,
+        **kwargs,
+    ):
+        self.calls.append(kwargs)
+        raise AssertionError(
+            "Final answer LLM must not run."
+        )
+
+
+class RecordingAuditService:
+    def __init__(self):
+        self.calls = []
+
+    def record(
+        self,
+        event,
+    ):
+        self.calls.append(event)
+        return uuid4()
 
 
 def citation_fixture(
@@ -463,3 +581,122 @@ def test_insufficient_qa_returns_no_citations():
     # No citation metadata should be queried
     # for an insufficient answer.
     assert repository.calls == []
+
+
+def test_authorization_infrastructure_failure_is_sanitized_over_http():
+    from app.domain.enums.audit import (
+        AuditEventType,
+        AuditOutcome,
+    )
+
+    embedding = NeverEmbeddingProvider()
+    retrieval = NeverRetrieval()
+    planner = NeverPlanner()
+    evidence = NeverEvidenceService()
+    answer = NeverAnswerService()
+    audit = RecordingAuditService()
+
+    search = AuthorizedSearchService(
+        authorization=AuthorizationService(
+            FailingAuthorizationRepository()
+        ),
+        embedding_provider=embedding,
+        retrieval=retrieval,
+    )
+
+    service = QuestionAnswerService(
+        search=search,
+        planner=planner,
+        evidence=evidence,
+        answer=answer,
+        audit=audit,
+        discovery_top_k=10,
+    )
+
+    app = create_app()
+
+    test_identity = SimpleNamespace(
+        user_id=uuid4()
+    )
+
+    app.dependency_overrides[
+        get_current_identity
+    ] = lambda: test_identity
+
+    app.dependency_overrides[
+        get_question_answer_service
+    ] = lambda: service
+
+    app.dependency_overrides[
+        get_citation_presentation_repository
+    ] = lambda: (
+        FakeCitationPresentationRepository([])
+    )
+
+    # Critical: observe the real HTTP response rather
+    # than allowing TestClient to re-raise the server
+    # exception into the test process.
+    client = TestClient(
+        app,
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(
+        endpoint(),
+        json={
+            "question": (
+                "Quel est le délai ?"
+            ),
+            "language": "fr",
+        },
+    )
+
+    assert response.status_code == 500
+
+    response_text = response.text
+
+    # Infrastructure details and secrets must never
+    # cross the HTTP boundary.
+    assert (
+        "SECRET_DATABASE_HOST"
+        not in response_text
+    )
+    assert "db.internal" not in response_text
+    assert "super-secret" not in response_text
+    assert "password" not in response_text.lower()
+
+    # No downstream business/model stage ran.
+    assert embedding.calls == []
+    assert retrieval.calls == []
+    assert planner.calls == []
+    assert evidence.calls == []
+    assert answer.calls == []
+
+    # Initial discovery failure is categorized in
+    # the audit trail.
+    assert len(audit.calls) == 1
+
+    failed = audit.calls[0]
+
+    assert (
+        failed.event_type
+        == AuditEventType.EVIDENCE_FAILED
+    )
+    assert (
+        failed.outcome
+        == AuditOutcome.FAILED
+    )
+    assert (
+        failed.error_code
+        == "EVIDENCE_DISCOVERY_FAILED"
+    )
+
+    audit_text = str(
+        failed.metadata
+    )
+
+    assert (
+        "SECRET_DATABASE_HOST"
+        not in audit_text
+    )
+    assert "super-secret" not in audit_text

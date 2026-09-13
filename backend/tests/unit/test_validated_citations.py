@@ -313,7 +313,65 @@ def test_canonical_validation_failure_aborts_set():
 
     with pytest.raises(
         InvalidCitationError
-    ):
+    ) as exc_info:
         citation_service.build(
             assessment
         )
+
+    print(
+        "\n===== CITATION LINEAGE TAMPERING ====="
+    )
+
+    print(
+        "Original document_id:",
+        source.document_id,
+    )
+
+    print(
+        "Tampered document_id:",
+        tampered_source.document_id,
+    )
+
+    print(
+        "Chunk ID preserved:",
+        tampered_source.chunk_id
+        == source.chunk_id,
+    )
+
+    print(
+        "Version ID preserved:",
+        (
+            tampered_source.document_version_id
+            == source.document_version_id
+        ),
+    )
+
+    print(
+        "Page ID preserved:",
+        (
+            tampered_source.page_id
+            == source.page_id
+        ),
+    )
+
+    print(
+        "Document ID changed:",
+        (
+            tampered_source.document_id
+            != source.document_id
+        ),
+    )
+
+    print(
+        "Validator rejection:",
+        type(exc_info.value).__name__,
+    )
+
+    print(
+        "Citation lineage tampering blocked: PASS"
+    )
+
+    assert (
+        tampered_source.document_id
+        != source.document_id
+    )

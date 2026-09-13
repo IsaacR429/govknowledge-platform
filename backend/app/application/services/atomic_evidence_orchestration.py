@@ -185,74 +185,113 @@ class AtomicEvidenceOrchestrationService:
             AtomicClaimEvidence
         ] = []
 
-        for claim in items:
-            claim_text = (
-                claim.text.strip()
-            )
-
-            # Authorization happens inside
-            # AuthorizedSearchService BEFORE
-            # embedding-backed retrieval.
-            search_result = (
-                self._search.search(
-                    identity=identity,
-                    query=claim_text,
-                    top_k=self._top_k,
+        try:
+            for claim in items:
+                claim_text = (
+                    claim.text.strip()
                 )
-            )
 
-            # Retrieval may be multilingual, but
-            # entailment verification is strictly
-            # same-language.
-            claim_language = (
-                claim.language
-                .strip()
-                .lower()
-            )
+                # Authorization happens inside
+                # AuthorizedSearchService BEFORE
+                # embedding-backed retrieval.
+                search_result = (
+                    self._search.search(
+                        identity=identity,
+                        query=claim_text,
+                        top_k=self._top_k,
+                    )
+                )
 
-            same_language_evidence = tuple(
-                item
-                for item in search_result.results
-                if (
-                    item.language
+                # Retrieval may be multilingual, but
+                # entailment verification is strictly
+                # same-language.
+                claim_language = (
+                    claim.language
                     .strip()
                     .lower()
-                    == claim_language
                 )
+
+                same_language_evidence = tuple(
+                    item
+                    for item in search_result.results
+                    if (
+                        item.language
+                        .strip()
+                        .lower()
+                        == claim_language
+                    )
+                )
+
+                # Only authorized, same-language
+                # retrieval results may enter NLI.
+                verification = (
+                    self._verification.verify(
+                        claim=claim_text,
+                        evidence=(
+                            same_language_evidence
+                        ),
+                    )
+                )
+
+                claim_results.append(
+                    AtomicClaimResult(
+                        claim=claim,
+                        retrieved_evidence=(
+                            search_result.results
+                        ),
+                        verification=verification,
+                    )
+                )
+
+                policy_inputs.append(
+                    AtomicClaimEvidence(
+                        claim_id=claim.claim_id,
+                        verification=verification,
+                        required=claim.required,
+                    )
+                )
+
+            assessment = self._policy.assess(
+                policy_inputs
             )
 
-            # Only authorized, same-language
-            # retrieval results may enter NLI.
-            verification = (
-                self._verification.verify(
-                    claim=claim_text,
-                    evidence=(
-                        same_language_evidence
+        except Exception:
+            # A system/security failure is
+            # categorically different from
+            # insufficient evidence.
+            #
+            # Do not persist raw claims, exception
+            # messages, prompts, or evidence text.
+            self._audit.record(
+                AuditEvent(
+                    event_type=(
+                        AuditEventType
+                        .EVIDENCE_FAILED
                     ),
-                )
-            )
-
-            claim_results.append(
-                AtomicClaimResult(
-                    claim=claim,
-                    retrieved_evidence=(
-                        search_result.results
+                    outcome=(
+                        AuditOutcome.FAILED
                     ),
-                    verification=verification,
+                    actor_user_id=(
+                        identity.user_id
+                    ),
+                    resource_type="qa_evidence",
+                    correlation_id=operation_id,
+                    error_code=(
+                        "EVIDENCE_EVALUATION_FAILED"
+                    ),
+                    metadata={
+                        "claim_count": len(items),
+                        "required_claim_count": (
+                            required_claim_count
+                        ),
+                        "completed_claim_count": (
+                            len(claim_results)
+                        ),
+                    },
                 )
             )
 
-            policy_inputs.append(
-                AtomicClaimEvidence(
-                    claim_id=claim.claim_id,
-                    verification=verification,
-                    required=claim.required,
-                )
-            )
-
-        assessment = self._policy.assess(
-            policy_inputs
-        )
+            raise
 
         total_retrieved = sum(
             len(

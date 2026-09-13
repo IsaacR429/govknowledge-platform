@@ -610,6 +610,115 @@ def test_authorization_failure_is_not_swallowed():
     assert verifier.calls == []
 
 
+def test_authorization_failure_has_failed_terminal_audit():
+    from app.domain.enums.audit import (
+        AuditEventType,
+        AuditOutcome,
+    )
+
+    claim = "Restricted claim"
+
+    search = FakeAuthorizedSearch(
+        fail_on_query=claim
+    )
+
+    verifier = FakeEntailmentVerifier(
+        labels_by_claim={}
+    )
+
+    audit = FakeAuditService()
+    identity = current_identity()
+    correlation_id = uuid4()
+
+    with pytest.raises(
+        RuntimeError,
+        match="Authorization boundary",
+    ):
+        service(
+            search=search,
+            verifier=verifier,
+            audit=audit,
+        ).evaluate(
+            identity=identity,
+            claims=(
+                AtomicClaim(
+                    claim_id="restricted",
+                    text=claim,
+                ),
+            ),
+            correlation_id=correlation_id,
+        )
+
+    # Authorization/search failure remains fatal.
+    assert verifier.calls == []
+
+    # We require an opening event plus one
+    # categorical terminal failure event.
+    assert len(audit.calls) == 2
+
+    submitted, failed = audit.calls
+
+    assert (
+        submitted.event_type
+        == AuditEventType.QUERY_SUBMITTED
+    )
+
+    assert (
+        submitted.outcome
+        == AuditOutcome.SUCCEEDED
+    )
+
+    # Compare the value deliberately so this
+    # regression can be written before the new
+    # enum member exists.
+    assert (
+        failed.event_type.value
+        == "EVIDENCE_FAILED"
+    )
+
+    assert (
+        failed.outcome
+        == AuditOutcome.FAILED
+    )
+
+    assert (
+        submitted.correlation_id
+        == correlation_id
+    )
+
+    assert (
+        failed.correlation_id
+        == correlation_id
+    )
+
+    assert (
+        failed.actor_user_id
+        == identity.user_id
+    )
+
+    # Failure metadata may describe the stage,
+    # but must not contain raw claims or the
+    # propagated exception message.
+    failed_metadata = str(
+        failed.metadata
+    )
+
+    assert claim not in failed_metadata
+
+    assert (
+        "Authorization boundary"
+        not in failed_metadata
+    )
+
+    # A system failure must never masquerade
+    # as a routine lack of evidence.
+    assert all(
+        event.event_type.value
+        != "EVIDENCE_INSUFFICIENT"
+        for event in audit.calls
+    )
+
+
 def test_multi_claim_authorization_failure_aborts_entire_request():
     authorized_claim = "Authorized claim"
     restricted_claim = "Restricted claim"

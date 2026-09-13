@@ -39,6 +39,9 @@ class AuditEventType(str, Enum):
     EVIDENCE_INSUFFICIENT = (
         "EVIDENCE_INSUFFICIENT"
     )
+    EVIDENCE_FAILED = (
+        "EVIDENCE_FAILED"
+    )
 
     CITATION_VALIDATED = (
         "CITATION_VALIDATED"

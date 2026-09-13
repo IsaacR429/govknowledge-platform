@@ -233,6 +233,25 @@ class RecordingQuestionClaimPlanner:
         return result
 
 
+class RecordingLLMProvider:
+    def __init__(
+        self,
+        provider,
+    ):
+        self._provider = provider
+        self.calls = []
+
+    def generate(
+        self,
+        request,
+    ):
+        self.calls.append(request)
+
+        return self._provider.generate(
+            request
+        )
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit(
@@ -721,9 +740,21 @@ def main() -> None:
         print("REAL GROUNDED LLM ANSWER")
         print("=" * 78)
 
-        answer_service = GroundedAnswerGenerationService(
-            citation_service=citation_service,
-            provider=get_llm_provider(get_settings()),
+        real_llm_provider = get_llm_provider(
+            get_settings()
+        )
+
+        recording_llm_provider = (
+            RecordingLLMProvider(
+                real_llm_provider
+            )
+        )
+
+        answer_service = (
+            GroundedAnswerGenerationService(
+                citation_service=citation_service,
+                provider=recording_llm_provider,
+            )
         )
 
         print()
@@ -795,6 +826,7 @@ def main() -> None:
                 planner=planner,
                 evidence=orchestration,
                 answer=answer_service,
+                audit=audit,
                 discovery_top_k=10,
             )
         )
@@ -802,6 +834,11 @@ def main() -> None:
         natural_question = (
             "Quel est le delai pour signaler "
             "un bagage enregistre endommage ?"
+        )
+
+        refusal_question = (
+            "Turkish Airlines garantit-elle un hotel gratuit "
+            "a chaque passager lorsqu'un vol est retarde ?"
         )
 
         natural_answer = (
@@ -918,11 +955,103 @@ def main() -> None:
         print()
         print("=" * 78)
         print(
+            "NATURAL QUESTION — REFUSAL CONTROL"
+        )
+        print("=" * 78)
+
+        llm_calls_before_refusal = len(
+            recording_llm_provider.calls
+        )
+
+        refusal_answer = (
+            question_answer_service.answer(
+                identity=identity,
+                question=refusal_question,
+                language="fr",
+            )
+        )
+
+        llm_calls_after_refusal = len(
+            recording_llm_provider.calls
+        )
+
+        print(
+            "Refusal status:",
+            refusal_answer.status,
+        )
+
+        print(
+            "Refusal answer:",
+            refusal_answer.answer
+            .encode("unicode_escape")
+            .decode(),
+        )
+
+        print(
+            "Refusal citation count:",
+            len(
+                refusal_answer
+                .citations
+                .citations
+            ),
+        )
+
+        print(
+            "Final LLM calls before refusal:",
+            llm_calls_before_refusal,
+        )
+
+        print(
+            "Final LLM calls after refusal:",
+            llm_calls_after_refusal,
+        )
+
+        assert (
+            refusal_answer.status
+            == "INSUFFICIENT_EVIDENCE"
+        )
+
+        assert refusal_answer.answer == (
+            "Les sources autorisées disponibles "
+            "ne permettent pas de répondre de "
+            "manière fiable à cette question."
+        )
+
+        assert (
+            refusal_answer.citations.citations
+            == ()
+        )
+
+        assert (
+            refusal_answer.cited_evidence_ids
+            == ()
+        )
+
+        assert (
+            llm_calls_after_refusal
+            == llm_calls_before_refusal
+        )
+
+        print(
+            "Final answer LLM bypass on refusal: PASS"
+        )
+
+        print(
+            "Natural-language refusal pipeline: PASS"
+        )
+
+        print()
+        print("=" * 78)
+        print(
             "REAL AUTHENTICATED HTTP Q&A PIPELINE"
         )
         print("=" * 78)
 
         http_app = create_app()
+
+        http_app.dependency_overrides[
+            get_llm_provider
+        ] = lambda: recording_llm_provider
 
         with TestClient(http_app) as client:
             login_response = client.post(
@@ -1120,6 +1249,99 @@ def main() -> None:
                 "HTTP citation contract: PASS"
             )
 
+            http_llm_calls_before_refusal = len(
+                recording_llm_provider.calls
+            )
+
+            http_refusal_response = client.post(
+                (
+                    f"{settings.api_prefix}"
+                    "/qa"
+                ),
+                headers=headers,
+                json={
+                    "question": (
+                        refusal_question
+                    ),
+                    "language": "fr",
+                },
+            )
+
+            assert (
+                http_refusal_response.status_code
+                == 200
+            )
+
+            http_refusal_body = (
+                http_refusal_response.json()
+            )
+
+            http_llm_calls_after_refusal = len(
+                recording_llm_provider.calls
+            )
+
+            print()
+            print(
+                "HTTP refusal status:",
+                http_refusal_body["status"],
+            )
+
+            print(
+                "HTTP refusal answer:",
+                http_refusal_body["answer"]
+                .encode("unicode_escape")
+                .decode(),
+            )
+
+            print(
+                "HTTP refusal citations:",
+                http_refusal_body["citations"],
+            )
+
+            print(
+                "HTTP final LLM calls before refusal:",
+                http_llm_calls_before_refusal,
+            )
+
+            print(
+                "HTTP final LLM calls after refusal:",
+                http_llm_calls_after_refusal,
+            )
+
+            assert (
+                http_refusal_body["status"]
+                == "INSUFFICIENT_EVIDENCE"
+            )
+
+            assert (
+                http_refusal_body["answer"]
+                == (
+                    "Les sources autorisées disponibles "
+                    "ne permettent pas de répondre de "
+                    "manière fiable à cette question."
+                )
+            )
+
+            assert (
+                http_refusal_body["citations"]
+                == []
+            )
+
+            assert (
+                http_llm_calls_after_refusal
+                == http_llm_calls_before_refusal
+            )
+
+            print(
+                "HTTP final answer LLM bypass "
+                "on refusal: PASS"
+            )
+
+            print(
+                "Authenticated HTTP refusal "
+                "pipeline: PASS"
+            )
+
             logout_response = client.post(
                 (
                     f"{settings.api_prefix}"
@@ -1147,6 +1369,11 @@ def main() -> None:
                         "language": "fr",
                     },
                 )
+            )
+
+            print(
+                "Post-logout /qa retry status:",
+                rejected_after_logout.status_code,
             )
 
             assert (

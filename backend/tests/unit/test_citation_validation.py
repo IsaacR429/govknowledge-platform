@@ -195,6 +195,7 @@ def test_valid_citation_passes():
 @pytest.mark.parametrize(
     "field",
     (
+        "chunk_id",
         "document_id",
         "document_version_id",
         "page_id",

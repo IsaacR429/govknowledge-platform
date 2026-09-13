@@ -282,6 +282,7 @@ def get_question_answer_service(
         planner=planner,
         evidence=evidence,
         answer=answer,
+        audit=audit,
         discovery_top_k=DISCOVERY_TOP_K,
     )
 
