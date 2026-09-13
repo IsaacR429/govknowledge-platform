@@ -28,3 +28,6 @@ data/
 # Local qualification/source documents
 /documents/qualification/
 /documents/sample/world-bank-procurement-fr.pdf
+
+# Local qualification output
+backend/performance_qualification_output.txt
