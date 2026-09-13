@@ -7,7 +7,15 @@ import os
 from pathlib import Path
 import sys
 
+from anthropic import Anthropic
 from sqlalchemy import func, select
+
+from app.application.services.question_answer import (
+    QuestionAnswerService,
+)
+from app.infrastructure.llm.anthropic_question_claim_planner import (
+    AnthropicQuestionClaimPlanner,
+)
 
 # Qualification must use only the already-frozen local model artifacts.
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -187,6 +195,30 @@ def print_retrieved_chunk(index, chunk) -> None:
         print("  " + "-" * 60)
         print(str(content)[:1000])
         print("  " + "-" * 60)
+
+
+class RecordingQuestionClaimPlanner:
+    def __init__(
+        self,
+        planner,
+    ):
+        self._planner = planner
+        self.calls = []
+        self.results = []
+
+    def plan(
+        self,
+        request,
+    ):
+        self.calls.append(request)
+
+        result = self._planner.plan(
+            request
+        )
+
+        self.results.append(result)
+
+        return result
 
 
 def main() -> None:
@@ -665,6 +697,195 @@ def main() -> None:
         answer_service = GroundedAnswerGenerationService(
             citation_service=citation_service,
             provider=get_llm_provider(get_settings()),
+        )
+
+        print()
+        print("=" * 78)
+        print(
+            "NATURAL QUESTION — FULL PLANNER "
+            "TO GROUNDED ANSWER PIPELINE"
+        )
+        print("=" * 78)
+
+        settings = get_settings()
+
+        if settings.anthropic_api_key is None:
+            raise RuntimeError(
+                "Anthropic API key is not configured."
+            )
+
+        if (
+            settings.anthropic_model is None
+            or not settings.anthropic_model.strip()
+        ):
+            raise RuntimeError(
+                "Anthropic model is not configured."
+            )
+
+        planner_client_kwargs = {
+            "api_key": (
+                settings
+                .anthropic_api_key
+                .get_secret_value()
+            ),
+        }
+
+        if (
+            settings.anthropic_workspace_id
+            and settings.anthropic_workspace_id.strip()
+        ):
+            planner_client_kwargs[
+                "default_headers"
+            ] = {
+                "anthropic-workspace-id": (
+                    settings
+                    .anthropic_workspace_id
+                    .strip()
+                )
+            }
+
+        planner = AnthropicQuestionClaimPlanner(
+            client=Anthropic(
+                **planner_client_kwargs
+            ),
+            model=(
+                settings
+                .anthropic_model
+                .strip()
+            ),
+            max_tokens=(
+                settings.anthropic_max_tokens
+            ),
+        )
+
+        planner = RecordingQuestionClaimPlanner(
+            planner
+        )
+
+        question_answer_service = (
+            QuestionAnswerService(
+                search=search,
+                planner=planner,
+                evidence=orchestration,
+                answer=answer_service,
+                discovery_top_k=10,
+            )
+        )
+
+        natural_question = (
+            "Quel est le delai pour signaler "
+            "un bagage enregistre endommage ?"
+        )
+
+        natural_answer = (
+            question_answer_service.answer(
+                identity=identity,
+                question=natural_question,
+                language="fr",
+            )
+        )
+
+        print()
+        print("=== NATURAL QUESTION DIAGNOSTIC ===")
+
+        print(
+            "Planner calls:",
+            len(planner.calls),
+        )
+
+        if planner.calls:
+            planner_request = (
+                planner.calls[-1]
+            )
+
+            print(
+                "Planner source language:",
+                planner_request.source_language,
+            )
+
+            print(
+                "Planner evidence count:",
+                len(
+                    planner_request.evidence
+                ),
+            )
+
+            for index, item in enumerate(
+                planner_request.evidence,
+                start=1,
+            ):
+                print()
+                print(
+                    f"DISCOVERY EVIDENCE {index}"
+                )
+                print(
+                    "language:",
+                    item.language,
+                )
+                print(
+                    "content:",
+                )
+                print(
+                    item.content
+                )
+
+        if planner.results:
+            print()
+            print("PLANNED CLAIMS:")
+
+            for index, claim in enumerate(
+                planner.results[-1],
+                start=1,
+            ):
+                print(
+                    f"{index}. {claim.text}"
+                )
+
+            if not planner.results[-1]:
+                print("<NONE>")
+
+        print()
+        print(
+            "Natural-question status:",
+            natural_answer.status,
+        )
+
+        print()
+        print("ANSWER:")
+        print(
+            natural_answer.answer
+            .encode("unicode_escape")
+            .decode()
+        )
+
+        print()
+        print("CITED EVIDENCE IDS:")
+        print(
+            natural_answer.cited_evidence_ids
+        )
+
+        print()
+        print(
+            "Correlation ID:",
+            natural_answer.correlation_id,
+        )
+
+        assert (
+            natural_answer.status
+            == "SUPPORTED"
+        )
+
+        assert (
+            natural_answer.citations.citations
+        )
+
+        assert (
+            natural_answer.cited_evidence_ids
+        )
+
+        print()
+        print(
+            "Natural-language question pipeline: PASS"
         )
 
         answer_result = answer_service.generate(
