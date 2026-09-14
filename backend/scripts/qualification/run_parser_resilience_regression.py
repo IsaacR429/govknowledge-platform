@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import hashlib
@@ -11,7 +11,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import pypdfium2 as pdfium
+from app.infrastructure.parsing.pdf_structural_preflight import (
+    preflight_pdf,
+)
+from scripts.qualification.audit_parser_resilience_fixtures import (
+    audit_f01,
+    audit_f02,
+    audit_f03,
+    audit_f04,
+    audit_f05,
+    audit_f06,
+    audit_f07,
+)
 
 from app.domain.enums.processing import (
     ParserFailureClass,
@@ -78,6 +89,17 @@ FINAL_PATH = (
 )
 
 
+FIXTURE_AUDITORS = {
+    "F01": audit_f01,
+    "F02": audit_f02,
+    "F03": audit_f03,
+    "F04": audit_f04,
+    "F05": audit_f05,
+    "F06": audit_f06,
+    "F07": audit_f07,
+}
+
+
 def load_json(path: Path) -> Any:
     return json.loads(
         path.read_text(
@@ -128,12 +150,9 @@ def sha256_file(path: Path) -> str:
 
 
 def page_count(path: Path) -> int:
-    pdf = pdfium.PdfDocument(path)
-
-    try:
-        return len(pdf)
-    finally:
-        pdf.close()
+    return preflight_pdf(
+        path
+    ).page_count
 
 
 def enum_value(value: Any) -> Any:
@@ -150,6 +169,9 @@ def result_to_dict(
 
     parsed_pages = None
     parsed_chunks = None
+    page_numbers = None
+    page_text_nonempty = None
+    page_provenance = None
 
     if worker.parsed_document is not None:
         parsed_pages = len(
@@ -158,6 +180,47 @@ def result_to_dict(
         parsed_chunks = len(
             worker.parsed_document.chunks
         )
+
+        page_numbers = [
+            page.page_number
+            for page
+            in worker.parsed_document.pages
+        ]
+
+        page_text_nonempty = {
+            str(page.page_number): bool(
+                page.text.strip()
+            )
+            for page
+            in worker.parsed_document.pages
+        }
+
+        page_provenance = {
+            str(page.page_number): {
+                "page_number": (
+                    page.metadata.get(
+                        "page_number"
+                    )
+                ),
+                "parser": (
+                    page.metadata.get(
+                        "parser"
+                    )
+                ),
+                "artifact_bundle_revision": (
+                    page.metadata.get(
+                        "artifact_bundle_revision"
+                    )
+                ),
+                "ocr_model_family": (
+                    page.metadata.get(
+                        "ocr_model_family"
+                    )
+                ),
+            }
+            for page
+            in worker.parsed_document.pages
+        }
 
     return {
         "final_status": (
@@ -198,6 +261,9 @@ def result_to_dict(
         ),
         "parsed_page_count": parsed_pages,
         "parsed_chunk_count": parsed_chunks,
+        "page_numbers": page_numbers,
+        "page_text_nonempty": page_text_nonempty,
+        "page_provenance": page_provenance,
         "return_code": worker.return_code,
         "exception_type": (
             worker.exception_type
@@ -455,6 +521,9 @@ def parse_one(
     timeout_seconds: float,
 ) -> dict[str, Any]:
     expected_pages = page_count(path)
+    source_sha256_before = sha256_file(
+        path
+    )
 
     started = time.perf_counter()
 
@@ -529,6 +598,21 @@ def parse_one(
         != expected_pages
     )
 
+    source_sha256_after = sha256_file(
+        path
+    )
+
+    record["source_sha256_before"] = (
+        source_sha256_before
+    )
+    record["source_sha256_after"] = (
+        source_sha256_after
+    )
+    record["source_unchanged"] = (
+        source_sha256_before
+        == source_sha256_after
+    )
+
     return record
 
 
@@ -536,8 +620,14 @@ def fixture_acceptance(
     *,
     fixture: dict[str, Any],
     result: dict[str, Any],
-) -> tuple[bool, list[str]]:
+    path: Path,
+) -> tuple[
+    bool,
+    list[str],
+    dict[str, Any],
+]:
     failures: list[str] = []
+    evidence: dict[str, Any] = {}
 
     fixture_id = fixture["fixture_id"]
 
@@ -565,6 +655,41 @@ def fixture_acceptance(
         "parsed_page_count"
     )
 
+    expected_page_numbers = list(
+        range(
+            1,
+            expected_pages + 1,
+        )
+    )
+
+    # Re-run the already-qualified, stdlib-only structural
+    # fixture assertion. This validates the intended hostile
+    # construction independently of Docling.
+    try:
+        FIXTURE_AUDITORS[
+            fixture_id
+        ](path)
+
+        evidence[
+            "source_fixture_structural_audit"
+        ] = True
+
+    except BaseException as exc:
+        evidence[
+            "source_fixture_structural_audit"
+        ] = False
+
+        evidence[
+            "source_fixture_structural_error"
+        ] = (
+            f"{type(exc).__name__}: "
+            f"{str(exc)[:1000]}"
+        )
+
+        failures.append(
+            "STRUCTURAL_FIXTURE_AUDIT_FAILED"
+        )
+
     if result.get("harness_exception"):
         failures.append(
             "UNHANDLED_EXCEPTION"
@@ -575,6 +700,14 @@ def fixture_acceptance(
     ):
         failures.append(
             "SILENT_PAGE_COUNT_CHANGE"
+        )
+
+    if not result.get(
+        "source_unchanged",
+        False,
+    ):
+        failures.append(
+            "SOURCE_BYTES_CHANGED"
         )
 
     if attempts > 1:
@@ -657,11 +790,209 @@ def fixture_acceptance(
             "FAILED_WITHOUT_FAILURE_CLASS"
         )
 
+    # Successful parses must preserve canonical page order.
+    if status == "SUCCESS":
+        actual_page_numbers = (
+            result.get(
+                "page_numbers"
+            )
+            or []
+        )
+
+        evidence[
+            "expected_page_numbers"
+        ] = expected_page_numbers
+
+        evidence[
+            "actual_page_numbers"
+        ] = actual_page_numbers
+
+        if (
+            actual_page_numbers
+            != expected_page_numbers
+        ):
+            failures.append(
+                "PAGE_ORDER_NOT_PRESERVED"
+            )
+
+        # Page-level provenance must survive the parser
+        # boundary.
+        provenance = (
+            result.get(
+                "page_provenance"
+            )
+            or {}
+        )
+
+        provenance_ok = True
+
+        for page_number in (
+            expected_page_numbers
+        ):
+            metadata = provenance.get(
+                str(page_number),
+                {},
+            )
+
+            if (
+                metadata.get(
+                    "page_number"
+                )
+                != page_number
+                or metadata.get(
+                    "parser"
+                )
+                != "docling"
+                or not metadata.get(
+                    "artifact_bundle_revision"
+                )
+                or not metadata.get(
+                    "ocr_model_family"
+                )
+            ):
+                provenance_ok = False
+                break
+
+        evidence[
+            "page_provenance_complete"
+        ] = provenance_ok
+
+        if not provenance_ok:
+            failures.append(
+                "PAGE_PROVENANCE_INCOMPLETE"
+            )
+
+    nonempty = (
+        result.get(
+            "page_text_nonempty"
+        )
+        or {}
+    )
+
+    # F04:
+    # the independent source audit proves exact source
+    # rotations 0/90/180/270. Direct parsing + exact page
+    # order + unchanged source bytes establishes that the
+    # rotated control was handled without rewrite/loss.
+    if fixture_id == "F04":
+        rotation_evidence = (
+            evidence.get(
+                "source_fixture_structural_audit"
+            )
+            and status == "SUCCESS"
+            and attempts == 0
+            and result.get(
+                "source_unchanged"
+            )
+            and result.get(
+                "page_numbers"
+            )
+            == [1, 2, 3, 4]
+        )
+
+        evidence[
+            "rotation_preservation_control"
+        ] = bool(
+            rotation_evidence
+        )
+
+        if not rotation_evidence:
+            failures.append(
+                "ROTATION_PRESERVATION_NOT_EVIDENCED"
+            )
+
+    # F06 source audit proves there is no native PDF text:
+    # successful non-empty extracted text on both pages
+    # therefore exercises the configured OCR path.
+    if fixture_id == "F06":
+        ocr_evidenced = (
+            status == "SUCCESS"
+            and all(
+                nonempty.get(
+                    str(page_number),
+                    False,
+                )
+                for page_number
+                in (1, 2)
+            )
+            and evidence.get(
+                "source_fixture_structural_audit"
+            )
+        )
+
+        evidence[
+            "ocr_path_exercised"
+        ] = bool(
+            ocr_evidenced
+        )
+
+        if not ocr_evidenced:
+            failures.append(
+                "OCR_PATH_NOT_EVIDENCED"
+            )
+
+    # F07 source audit proves native-text pages 1/3 and
+    # image-only pages 2/4. Non-empty parser output on the
+    # corresponding pages provides output-side evidence for
+    # both paths while retaining exact page provenance.
+    if fixture_id == "F07":
+        native_evidenced = (
+            status == "SUCCESS"
+            and all(
+                nonempty.get(
+                    str(page_number),
+                    False,
+                )
+                for page_number
+                in (1, 3)
+            )
+            and evidence.get(
+                "source_fixture_structural_audit"
+            )
+        )
+
+        ocr_evidenced = (
+            status == "SUCCESS"
+            and all(
+                nonempty.get(
+                    str(page_number),
+                    False,
+                )
+                for page_number
+                in (2, 4)
+            )
+            and evidence.get(
+                "source_fixture_structural_audit"
+            )
+        )
+
+        evidence[
+            "native_text_path_exercised"
+        ] = bool(
+            native_evidenced
+        )
+
+        evidence[
+            "ocr_path_exercised"
+        ] = bool(
+            ocr_evidenced
+        )
+
+        if not native_evidenced:
+            failures.append(
+                "NATIVE_TEXT_PATH_NOT_EVIDENCED"
+            )
+
+        if not ocr_evidenced:
+            failures.append(
+                "OCR_PATH_NOT_EVIDENCED"
+            )
+
     return (
         len(failures) == 0,
         failures,
+        evidence,
     )
-
 
 def main() -> int:
     argument_parser = (
@@ -1007,10 +1338,11 @@ def main() -> int:
             ),
         )
 
-        passed, failures = (
+        passed, failures, evidence = (
             fixture_acceptance(
                 fixture=fixture,
                 result=result,
+                path=path,
             )
         )
 
@@ -1041,6 +1373,9 @@ def main() -> int:
         result[
             "acceptance_failures"
         ] = failures
+        result[
+            "integrity_evidence"
+        ] = evidence
 
         report[
             "fixture_executions"
