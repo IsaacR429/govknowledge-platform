@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import hashlib
 import tempfile
@@ -6,7 +6,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import pypdfium2 as pdfium
+from app.infrastructure.parsing.pdf_structural_preflight import (
+    preflight_pdf,
+)
 
 from app.domain.enums.processing import (
     ParserFailureClass,
@@ -62,19 +64,9 @@ def _sha256_file(path: Path) -> str:
 def _independent_page_count(
     path: Path,
 ) -> int:
-    pdf = pdfium.PdfDocument(path)
-
-    try:
-        count = len(pdf)
-    finally:
-        pdf.close()
-
-    if count < 1:
-        raise ValueError(
-            "PDF contains no pages."
-        )
-
-    return count
+    return preflight_pdf(
+        path
+    ).page_count
 
 
 def _terminal_normalization_failure(
