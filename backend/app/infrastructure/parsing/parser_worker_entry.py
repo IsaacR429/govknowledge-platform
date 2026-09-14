@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
@@ -51,6 +52,7 @@ def _run_memory_pressure(
 
     while allocated < allocation_bytes:
         remaining = allocation_bytes - allocated
+
         current = min(
             block_size,
             remaining,
@@ -58,8 +60,6 @@ def _run_memory_pressure(
 
         block = bytearray(current)
 
-        # Touch every 4 KiB page so the allocation
-        # cannot remain merely virtual/reserved.
         for offset in range(
             0,
             len(block),
@@ -71,6 +71,89 @@ def _run_memory_pressure(
         allocated += current
 
 
+def _serialize_parsed_document(
+    parsed: object,
+) -> dict[str, object]:
+    pages = []
+
+    for page in parsed.pages:
+        pages.append(
+            {
+                "page_number": page.page_number,
+                "text": page.text,
+                "metadata": page.metadata,
+            }
+        )
+
+    chunks = []
+
+    for chunk in parsed.chunks:
+        chunks.append(
+            {
+                "page_number": chunk.page_number,
+                "chunk_index": chunk.chunk_index,
+                "content": chunk.content,
+                "section_title": chunk.section_title,
+                "language": chunk.language,
+                "metadata": chunk.metadata,
+            }
+        )
+
+    return {
+        "pages": pages,
+        "chunks": chunks,
+    }
+
+
+def _run_parse(
+    *,
+    file_path: Path,
+    language: str,
+    artifacts_path: Path | None,
+) -> tuple[
+    dict[str, object],
+    float,
+    float,
+]:
+    # These must be set before Docling and its model
+    # dependencies are imported.
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+    setup_started = time.perf_counter()
+
+    from app.infrastructure.parsing.docling_parser import (
+        DoclingDocumentParser,
+    )
+
+    parser = DoclingDocumentParser(
+        artifacts_path=artifacts_path,
+    )
+
+    worker_setup_ms = (
+        time.perf_counter()
+        - setup_started
+    ) * 1000.0
+
+    execution_started = time.perf_counter()
+
+    parsed = parser.parse(
+        file_path,
+        language=language,
+    )
+
+    parser_execution_ms = (
+        time.perf_counter()
+        - execution_started
+    ) * 1000.0
+
+    return (
+        _serialize_parsed_document(parsed),
+        worker_setup_ms,
+        parser_execution_ms,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
 
@@ -79,6 +162,7 @@ def main() -> int:
         choices=(
             "sleep",
             "memory",
+            "parse",
         ),
         required=True,
     )
@@ -101,11 +185,29 @@ def main() -> int:
         default=0,
     )
 
+    parser.add_argument(
+        "--file-path",
+        type=Path,
+    )
+
+    parser.add_argument(
+        "--language",
+        type=str,
+    )
+
+    parser.add_argument(
+        "--artifacts-path",
+        type=Path,
+    )
+
     args = parser.parse_args()
 
     _wait_for_parent_signal()
 
     started = time.perf_counter()
+
+    worker_setup_ms: float | None = None
+    parser_execution_ms: float | None = None
 
     try:
         if args.mode == "sleep":
@@ -120,40 +222,100 @@ def main() -> int:
                 ),
             )
 
-        else:
-            raise AssertionError(
-                f"Unsupported worker mode: {args.mode}"
+        elif args.mode == "parse":
+            if args.file_path is None:
+                raise ValueError(
+                    "--file-path is required "
+                    "for parse mode."
+                )
+
+            if not args.language:
+                raise ValueError(
+                    "--language is required "
+                    "for parse mode."
+                )
+
+            (
+                serialized,
+                worker_setup_ms,
+                parser_execution_ms,
+            ) = _run_parse(
+                file_path=args.file_path,
+                language=args.language,
+                artifacts_path=args.artifacts_path,
             )
 
-    except MemoryError:
-        elapsed_ms = (
-            time.perf_counter() - started
-        ) * 1000.0
+            _write_result(
+                args.result_path,
+                {
+                    "status": "SUCCESS",
+                    "failure_class": None,
+                    "worker_setup_ms": (
+                        worker_setup_ms
+                    ),
+                    "parser_execution_ms": (
+                        parser_execution_ms
+                    ),
+                    "parsed_document": serialized,
+                },
+            )
 
+            return 0
+
+        else:
+            raise AssertionError(
+                f"Unsupported worker mode: "
+                f"{args.mode}"
+            )
+
+    except MemoryError as exc:
         _write_result(
             args.result_path,
             {
                 "status": "FAILED",
                 "failure_class": "OOM",
-                "execution_ms": elapsed_ms,
+                "worker_setup_ms": (
+                    worker_setup_ms
+                ),
+                "parser_execution_ms": (
+                    parser_execution_ms
+                ),
+                "execution_ms": (
+                    time.perf_counter()
+                    - started
+                ) * 1000.0,
+                "exception_type": (
+                    type(exc).__name__
+                ),
+                "exception_message": (
+                    str(exc)[:2000]
+                ),
             },
         )
 
         return 42
 
     except BaseException as exc:
-        elapsed_ms = (
-            time.perf_counter() - started
-        ) * 1000.0
-
         _write_result(
             args.result_path,
             {
                 "status": "FAILED",
                 "failure_class": "UNKNOWN",
-                "execution_ms": elapsed_ms,
+                "worker_setup_ms": (
+                    worker_setup_ms
+                ),
+                "parser_execution_ms": (
+                    parser_execution_ms
+                ),
+                "execution_ms": (
+                    time.perf_counter()
+                    - started
+                ) * 1000.0,
                 "exception_type": (
                     type(exc).__name__
+                ),
+                "exception_message": (
+                    str(exc)[:2000]
                 ),
             },
         )
@@ -161,7 +323,8 @@ def main() -> int:
         return 1
 
     elapsed_ms = (
-        time.perf_counter() - started
+        time.perf_counter()
+        - started
     ) * 1000.0
 
     _write_result(
