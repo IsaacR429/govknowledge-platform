@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -154,6 +154,24 @@ def _run_parse(
     )
 
 
+def _classify_failure(
+    exc: BaseException,
+) -> str:
+    """Map known parser failures to the frozen failure taxonomy."""
+
+    exception_type = type(exc).__name__
+    message = str(exc).lower()
+
+    if (
+        exception_type == "ConversionError"
+        and "could not find the page-dimensions"
+        in message
+    ):
+        return "UNRESOLVED_PAGE_GEOMETRY"
+
+    return "UNKNOWN"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
 
@@ -300,7 +318,9 @@ def main() -> int:
             args.result_path,
             {
                 "status": "FAILED",
-                "failure_class": "UNKNOWN",
+                "failure_class": _classify_failure(
+                    exc
+                ),
                 "worker_setup_ms": (
                     worker_setup_ms
                 ),
