@@ -1,0 +1,61 @@
+{
+  "deterministic": true,
+  "fixture_count": 7,
+  "fixture_spec_sha256": "fe1c6a1767482f927350f075568e4bec5b1e05d2b4f56d48cae1302444b260ba",
+  "fixtures": [
+    {
+      "expected_page_count": 34,
+      "filename": "carta_nu_deep_inherited_mediabox.pdf",
+      "fixture_id": "F01",
+      "sha256": "eafe731a1bb8d1ce0478f3b2942b8cb81ca2ee827d8869b8098cbabfcf203ed8",
+      "size_bytes": 67715
+    },
+    {
+      "expected_page_count": 3,
+      "filename": "page_tree_count_mismatch.pdf",
+      "fixture_id": "F02",
+      "sha256": "2da0156524d57ce402072d198843bd06d85cab401a609acd5b6e210244dad457",
+      "size_bytes": 1120
+    },
+    {
+      "expected_page_count": 3,
+      "filename": "page_tree_fragmented_parent_chain.pdf",
+      "fixture_id": "F03",
+      "sha256": "ecdba1dec68facd459c4829da40e19bbed9e3f1643aa2a675750634fcf035294",
+      "size_bytes": 1307
+    },
+    {
+      "expected_page_count": 4,
+      "filename": "rotated_pages_90_180_270.pdf",
+      "fixture_id": "F04",
+      "sha256": "be7c8baf1664eeedbcceacd73cd0286ea9786556715f0da846134613ed8b2b8a",
+      "size_bytes": 1405
+    },
+    {
+      "expected_page_count": 3,
+      "filename": "recoverable_damaged_xref.pdf",
+      "fixture_id": "F05",
+      "sha256": "609c2ddff6f04813d1811b3240199596c4c0e42e6a1346041be320b5f3be58fe",
+      "size_bytes": 1113
+    },
+    {
+      "expected_page_count": 2,
+      "filename": "ocr_only_scan.pdf",
+      "fixture_id": "F06",
+      "sha256": "4491c5e090e7f1de72f4274fb819f14325ef2c1c1369c018d365592b8f181c2e",
+      "size_bytes": 2874
+    },
+    {
+      "expected_page_count": 4,
+      "filename": "mixed_text_and_scan.pdf",
+      "fixture_id": "F07",
+      "sha256": "fe4c345c9dc49627e50d19179ff5f0398f2b1cc6c3500fe8f610ad04b70e9a43",
+      "size_bytes": 3257
+    }
+  ],
+  "generator_sha256": "f54059d24f37f0ee83c48952c259eb8620d3b0f0225783ad51ad9dd0cd4a0c48",
+  "generator_version": 1,
+  "manifest_id": "govknowledge-parser-adversarial-fixtures-manifest-2026-09-14",
+  "source_corpus_manifest_sha256": "098e6eaa143bab2c0892cfd2c67626ff4eb10a4eb7d0f9be10a862859bd25ef1",
+  "suite_id": "PARSER-RESILIENCE-REGRESSION-01"
+}
