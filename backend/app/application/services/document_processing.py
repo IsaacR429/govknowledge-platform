@@ -7,6 +7,9 @@ from app.application.ports.audit import (
 from app.application.ports.document_parser import (
     DocumentParser,
 )
+from app.application.ports.parser_execution import (
+    ParserExecutor,
+)
 from app.application.ports.document_processing_repository import (
     DocumentProcessingRepository,
     ProcessingTarget,
@@ -24,6 +27,9 @@ from app.application.services.parsed_document_validation import (
 from app.domain.enums.audit import (
     AuditEventType,
     AuditOutcome,
+)
+from app.domain.enums.processing import (
+    ParsingStatus,
 )
 
 
@@ -47,12 +53,23 @@ class DocumentProcessingService:
         *,
         repository: DocumentProcessingRepository,
         storage: FileStorage,
-        parser: DocumentParser,
         audit: AuditService,
+        parser: DocumentParser | None = None,
+        parser_executor: ParserExecutor | None = None,
     ) -> None:
+        if (
+            (parser is None)
+            == (parser_executor is None)
+        ):
+            raise ValueError(
+                "Exactly one of parser or "
+                "parser_executor must be supplied."
+            )
+
         self._repository = repository
         self._storage = storage
         self._parser = parser
+        self._parser_executor = parser_executor
         self._audit = audit
 
     def _record_lifecycle_event(
@@ -124,10 +141,57 @@ class DocumentProcessingService:
                 target.storage_path
             )
 
-            parsed = self._parser.parse(
-                file_path,
-                language=target.language,
-            )
+            if self._parser_executor is not None:
+                execution = (
+                    self._parser_executor.execute(
+                        file_path,
+                        language=target.language,
+                    )
+                )
+
+                self._repository.record_parser_outcome(
+                    version_id=target.version_id,
+                    processing_job_id=(
+                        target.processing_job_id
+                    ),
+                    parsing_status=(
+                        execution.parsing_status
+                    ),
+                    failure_class=(
+                        execution.failure_class
+                    ),
+                    parser_lineage=(
+                        execution.lineage
+                    ),
+                )
+
+                if (
+                    execution.parsing_status
+                    is ParsingStatus.FAILED
+                ):
+                    raise RuntimeError(
+                        "Document parser "
+                        "execution failed."
+                    )
+
+                parsed = (
+                    execution.parsed_document
+                )
+
+                if parsed is None:
+                    raise RuntimeError(
+                        "Successful parser "
+                        "execution returned "
+                        "no document."
+                    )
+
+            else:
+                assert self._parser is not None
+
+                parsed = self._parser.parse(
+                    file_path,
+                    language=target.language,
+                )
 
             validate_parsed_document(
                 parsed,

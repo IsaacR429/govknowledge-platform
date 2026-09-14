@@ -12,7 +12,11 @@ from app.application.ports.document_processing_repository import (
     ProcessingJobAttempt,
     ProcessingTarget,
 )
-from app.domain.enums.processing import ProcessingStatus
+from app.domain.enums.processing import (
+    ParserFailureClass,
+    ParsingStatus,
+    ProcessingStatus,
+)
 from app.infrastructure.database.models.documents import (
     Document,
     DocumentChunk,
@@ -278,6 +282,69 @@ class PostgresDocumentProcessingRepository(
             raise
 
         return target
+
+    def record_parser_outcome(
+        self,
+        *,
+        version_id: UUID,
+        processing_job_id: UUID,
+        parsing_status: ParsingStatus,
+        failure_class: ParserFailureClass | None,
+        parser_lineage: dict[str, object],
+    ) -> None:
+        version, job = self._load(
+            version_id=version_id,
+            processing_job_id=processing_job_id,
+        )
+
+        if (
+            version.processing_status
+            != ProcessingStatus.PROCESSING.value
+            or job.status
+            != ProcessingStatus.PROCESSING.value
+        ):
+            raise ValueError(
+                "Parser outcome can only be "
+                "recorded while processing."
+            )
+
+        if (
+            parsing_status is ParsingStatus.SUCCESS
+            and failure_class is not None
+        ):
+            raise ValueError(
+                "Successful parsing cannot have "
+                "a failure class."
+            )
+
+        if (
+            parsing_status is ParsingStatus.FAILED
+            and failure_class is None
+        ):
+            raise ValueError(
+                "Failed parsing requires "
+                "a failure class."
+            )
+
+        job.parsing_status = (
+            parsing_status.value
+        )
+
+        job.failure_class = (
+            failure_class.value
+            if failure_class is not None
+            else None
+        )
+
+        job.parser_lineage_json = dict(
+            parser_lineage
+        )
+
+        try:
+            self._db.commit()
+        except Exception:
+            self._db.rollback()
+            raise
 
     def complete_processing(
         self,

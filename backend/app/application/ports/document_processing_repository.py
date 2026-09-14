@@ -5,6 +5,10 @@ from uuid import UUID
 from app.application.ports.document_parser import (
     ParsedDocument,
 )
+from app.domain.enums.processing import (
+    ParserFailureClass,
+    ParsingStatus,
+)
 
 
 @dataclass(frozen=True)
@@ -36,6 +40,17 @@ class DocumentProcessingRepository(Protocol):
         *,
         processing_job_id: UUID,
     ) -> ProcessingTarget:
+        ...
+
+    def record_parser_outcome(
+        self,
+        *,
+        version_id: UUID,
+        processing_job_id: UUID,
+        parsing_status: ParsingStatus,
+        failure_class: ParserFailureClass | None,
+        parser_lineage: dict[str, object],
+    ) -> None:
         ...
 
     def complete_processing(

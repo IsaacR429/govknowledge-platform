@@ -19,6 +19,8 @@ from app.application.services.document_processing import (
     ProcessDocumentRequest,
 )
 from app.domain.enums.processing import (
+    ParserFailureClass,
+    ParsingStatus,
     ProcessingStatus,
 )
 from app.infrastructure.database.models.documents import (
@@ -855,6 +857,111 @@ def test_processing_target_is_derived_from_database(
                 version_id=(
                     created.version_id
                 ),
+            )
+
+        db.close()
+
+
+
+def test_parser_outcome_persists_across_fresh_session(
+    tmp_path,
+):
+    db = SessionLocal()
+    verification_db = None
+    created = None
+
+    storage = LocalFileStorage(
+        tmp_path / "documents"
+    )
+
+    lineage = {
+        "execution_mode": "ISOLATED_WORKER",
+        "parser_family": "docling",
+        "original_sha256": "abc123",
+        "normalization_attempted": False,
+        "normalization_attempt_count": 0,
+        "metrics": {
+            "worker_spawn_ms": 12.5,
+            "parser_execution_ms": 750.0,
+        },
+    }
+
+    try:
+        created = ingest_document(
+            db,
+            storage,
+        )
+
+        repository = (
+            PostgresDocumentProcessingRepository(
+                db
+            )
+        )
+
+        target = repository.mark_processing(
+            processing_job_id=(
+                created.processing_job_id
+            )
+        )
+
+        repository.record_parser_outcome(
+            version_id=target.version_id,
+            processing_job_id=(
+                target.processing_job_id
+            ),
+            parsing_status=(
+                ParsingStatus.FAILED
+            ),
+            failure_class=(
+                ParserFailureClass.TIMEOUT
+            ),
+            parser_lineage=lineage,
+        )
+
+        # Read through a completely new SQLAlchemy
+        # Session. This proves record_parser_outcome()
+        # committed the values instead of merely
+        # mutating the original ORM identity map.
+        verification_db = SessionLocal()
+
+        persisted = verification_db.get(
+            DocumentProcessingJob,
+            created.processing_job_id,
+        )
+
+        assert persisted is not None
+
+        # Parser outcome recording is independent
+        # from the overall processing lifecycle.
+        assert (
+            persisted.status
+            == ProcessingStatus.PROCESSING.value
+        )
+
+        assert (
+            persisted.parsing_status
+            == ParsingStatus.FAILED.value
+        )
+
+        assert (
+            persisted.failure_class
+            == ParserFailureClass.TIMEOUT.value
+        )
+
+        assert (
+            persisted.parser_lineage_json
+            == lineage
+        )
+
+    finally:
+        if verification_db is not None:
+            verification_db.close()
+
+        if created is not None:
+            cleanup_document(
+                db,
+                document_id=created.document_id,
+                version_id=created.version_id,
             )
 
         db.close()
