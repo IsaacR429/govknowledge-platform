@@ -907,3 +907,291 @@ def run_document_worker(
             exception_type=None,
             exception_message=None,
         )
+
+def run_external_document_worker(
+    *,
+    python_executable: Path,
+    worker_script: Path,
+    file_path: Path,
+    language: str,
+    timeout_seconds: float,
+    max_chunk_chars: int = 1500,
+) -> DocumentWorkerRunResult:
+    """
+    Run a parser worker in a separately selected Python runtime.
+
+    The worker must implement the existing GovKnowledge JSON
+    result contract and accept:
+    --result-path
+    --file-path
+    --language
+    --max-chunk-chars
+
+    Process isolation, timeout enforcement, Job Object lifetime,
+    and RSS measurement remain owned by _execute_worker().
+    """
+    python_path = python_executable.resolve()
+    script_path = worker_script.resolve()
+    source_path = file_path.resolve()
+
+    if not python_path.is_file():
+        raise FileNotFoundError(
+            python_path
+        )
+
+    if not script_path.is_file():
+        raise FileNotFoundError(
+            script_path
+        )
+
+    if not source_path.is_file():
+        raise FileNotFoundError(
+            source_path
+        )
+
+    if not language:
+        raise ValueError(
+            "language cannot be empty."
+        )
+
+    if max_chunk_chars < 1:
+        raise ValueError(
+            "max_chunk_chars must be positive."
+        )
+
+    with tempfile.TemporaryDirectory(
+        prefix="govknowledge-external-parser-worker-"
+    ) as temporary_directory:
+        result_path = (
+            Path(temporary_directory)
+            / "result.json"
+        )
+
+        command = [
+            str(python_path),
+            str(script_path),
+            "--result-path",
+            str(result_path),
+            "--file-path",
+            str(source_path),
+            "--language",
+            language,
+            "--max-chunk-chars",
+            str(max_chunk_chars),
+        ]
+
+        raw = _execute_worker(
+            command=command,
+            timeout_seconds=timeout_seconds,
+        )
+
+        payload = raw.payload
+
+        if raw.timed_out:
+            return DocumentWorkerRunResult(
+                parsing_status=(
+                    ParsingStatus.FAILED
+                ),
+                failure_class=(
+                    ParserFailureClass.TIMEOUT
+                ),
+                parsed_document=None,
+                return_code=raw.return_code,
+                worker_spawn_ms=(
+                    raw.worker_spawn_ms
+                ),
+                worker_setup_ms=None,
+                parser_execution_ms=None,
+                worker_teardown_ms=(
+                    raw.worker_teardown_ms
+                ),
+                end_to_end_document_processing_ms=(
+                    raw.end_to_end_ms
+                ),
+                worker_peak_rss_bytes=(
+                    raw.worker_peak_rss_bytes
+                ),
+                exception_type=None,
+                exception_message=None,
+            )
+
+        if (
+            raw.return_code == 0
+            and payload is not None
+            and payload.get("status")
+            == "SUCCESS"
+        ):
+            try:
+                parsed = (
+                    _deserialize_parsed_document(
+                        payload
+                    )
+                )
+
+            except Exception as exc:
+                return DocumentWorkerRunResult(
+                    parsing_status=(
+                        ParsingStatus.FAILED
+                    ),
+                    failure_class=(
+                        ParserFailureClass.UNKNOWN
+                    ),
+                    parsed_document=None,
+                    return_code=raw.return_code,
+                    worker_spawn_ms=(
+                        raw.worker_spawn_ms
+                    ),
+                    worker_setup_ms=(
+                        _payload_number(
+                            payload,
+                            "worker_setup_ms",
+                        )
+                    ),
+                    parser_execution_ms=(
+                        _payload_number(
+                            payload,
+                            "parser_execution_ms",
+                        )
+                    ),
+                    worker_teardown_ms=(
+                        raw.worker_teardown_ms
+                    ),
+                    end_to_end_document_processing_ms=(
+                        raw.end_to_end_ms
+                    ),
+                    worker_peak_rss_bytes=(
+                        raw.worker_peak_rss_bytes
+                    ),
+                    exception_type=(
+                        type(exc).__name__
+                    ),
+                    exception_message=(
+                        str(exc)[:2000]
+                    ),
+                )
+
+            return DocumentWorkerRunResult(
+                parsing_status=(
+                    ParsingStatus.SUCCESS
+                ),
+                failure_class=None,
+                parsed_document=parsed,
+                return_code=raw.return_code,
+                worker_spawn_ms=(
+                    raw.worker_spawn_ms
+                ),
+                worker_setup_ms=(
+                    _payload_number(
+                        payload,
+                        "worker_setup_ms",
+                    )
+                ),
+                parser_execution_ms=(
+                    _payload_number(
+                        payload,
+                        "parser_execution_ms",
+                    )
+                ),
+                worker_teardown_ms=(
+                    raw.worker_teardown_ms
+                ),
+                end_to_end_document_processing_ms=(
+                    raw.end_to_end_ms
+                ),
+                worker_peak_rss_bytes=(
+                    raw.worker_peak_rss_bytes
+                ),
+                exception_type=None,
+                exception_message=None,
+            )
+
+        if (
+            payload is not None
+            and payload.get("status")
+            == "FAILED"
+        ):
+            raw_failure = payload.get(
+                "failure_class"
+            )
+
+            try:
+                failure = ParserFailureClass(
+                    str(raw_failure)
+                )
+
+            except ValueError:
+                failure = (
+                    ParserFailureClass.UNKNOWN
+                )
+
+            return DocumentWorkerRunResult(
+                parsing_status=(
+                    ParsingStatus.FAILED
+                ),
+                failure_class=failure,
+                parsed_document=None,
+                return_code=raw.return_code,
+                worker_spawn_ms=(
+                    raw.worker_spawn_ms
+                ),
+                worker_setup_ms=(
+                    _payload_number(
+                        payload,
+                        "worker_setup_ms",
+                    )
+                ),
+                parser_execution_ms=(
+                    _payload_number(
+                        payload,
+                        "parser_execution_ms",
+                    )
+                ),
+                worker_teardown_ms=(
+                    raw.worker_teardown_ms
+                ),
+                end_to_end_document_processing_ms=(
+                    raw.end_to_end_ms
+                ),
+                worker_peak_rss_bytes=(
+                    raw.worker_peak_rss_bytes
+                ),
+                exception_type=(
+                    _payload_text(
+                        payload,
+                        "exception_type",
+                    )
+                ),
+                exception_message=(
+                    _payload_text(
+                        payload,
+                        "exception_message",
+                    )
+                ),
+            )
+
+        return DocumentWorkerRunResult(
+            parsing_status=(
+                ParsingStatus.FAILED
+            ),
+            failure_class=(
+                ParserFailureClass.NATIVE_CRASH
+            ),
+            parsed_document=None,
+            return_code=raw.return_code,
+            worker_spawn_ms=(
+                raw.worker_spawn_ms
+            ),
+            worker_setup_ms=None,
+            parser_execution_ms=None,
+            worker_teardown_ms=(
+                raw.worker_teardown_ms
+            ),
+            end_to_end_document_processing_ms=(
+                raw.end_to_end_ms
+            ),
+            worker_peak_rss_bytes=(
+                raw.worker_peak_rss_bytes
+            ),
+            exception_type=None,
+            exception_message=None,
+        )
