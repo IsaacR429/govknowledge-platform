@@ -84,6 +84,7 @@ class PostgresVectorRetrievalAdapter(
                 DocumentChunk.page_start.label(
                     "page_number"
                 ),
+                DocumentChunk.page_end.label("page_end"),
                 DocumentChunk.chunk_index,
                 DocumentChunk.content,
                 DocumentChunk.section_title,
@@ -145,6 +146,7 @@ class PostgresVectorRetrievalAdapter(
                 ),
                 page_id=row.page_id,
                 page_number=row.page_number,
+                page_end=row.page_end,
                 chunk_index=row.chunk_index,
                 content=row.content,
                 section_title=row.section_title,

@@ -1,5 +1,9 @@
 from fastapi import FastAPI
 
+from app.api.routes.documents import (
+    router as documents_router,
+)
+
 from app.api.routes.authentication import (
     router as authentication_router,
 )
@@ -44,6 +48,11 @@ def create_app() -> FastAPI:
 
     application.include_router(
         qa_router,
+        prefix=settings.api_prefix,
+    )
+
+    application.include_router(
+        documents_router,
         prefix=settings.api_prefix,
     )
 

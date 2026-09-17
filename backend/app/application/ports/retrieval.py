@@ -19,6 +19,8 @@ class RetrievedChunk:
     section_title: str | None
     language: str
     score: float
+    # None means page-range provenance is unavailable.
+    page_end: int | None = None
 
 
 class RetrievalPort(Protocol):

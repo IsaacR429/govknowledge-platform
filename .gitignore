@@ -33,3 +33,9 @@ data/
 
 # Local qualification output
 backend/performance_qualification_output.txt
+
+# Generated parser-resilience qualification output
+/documents/qualification/parser-resilience/results/
+
+# Local one-off UNICEF vertical-slice manifest
+/documents/qualification/parser-resilience/UNICEF-PYMUPDF-VERTICAL-SLICE-MANIFEST.json

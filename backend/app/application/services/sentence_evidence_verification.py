@@ -135,13 +135,104 @@ def _sentence_candidates(
     )
 
 
+# Experimental, opt-in fallback. Context must remain a single,
+# exact, contiguous source-chunk slice.
+_MAX_CONTEXT_CHARS = 1000
+_HEADING_LINE = re.compile(
+    r"(?im)^[ \t]*(?:#{1,6}[ \t]+\S[^\r\n]*|article[ \t]+\d+[ \t]*[:.]?)[ \t]*$"
+)
+
+
+def _looks_like_document_title(content: str) -> bool:
+    first_line = content.splitlines()[0].strip()
+    return (
+        20 <= len(first_line) <= 120
+        and first_line == first_line.upper()
+        and any(character.isalpha() for character in first_line)
+        and not first_line.endswith(".")
+    )
+
+
+def _contextual_candidates(
+    chunk: RetrievedChunk,
+) -> tuple[_SentenceCandidate, ...]:
+    # Never infer single-page provenance from page_number alone.
+    if (
+        chunk.page_number < 1
+        or chunk.page_end is None
+        or chunk.page_end != chunk.page_number
+    ):
+        return ()
+
+    sentences = _sentence_candidates(chunk)
+    expanded: list[_SentenceCandidate] = []
+    seen: set[tuple[int, int]] = set()
+
+    def add(start: int, end: int, sentence_index: int) -> None:
+        if not (0 <= start < end <= len(chunk.content)):
+            return
+        if end - start > _MAX_CONTEXT_CHARS:
+            return
+        if (start, end) in seen:
+            return
+
+        # This text is a canonical substring, not a reconstructed premise.
+        source_text = chunk.content[start:end]
+        if not source_text.strip():
+            return
+
+        seen.add((start, end))
+        expanded.append(
+            _SentenceCandidate(
+                chunk=chunk,
+                sentence_index=sentence_index,
+                start_char=start,
+                end_char=end,
+                text=source_text,
+            )
+        )
+
+    for fact_index in range(1, len(sentences)):
+        heading = sentences[fact_index - 1]
+        fact = sentences[fact_index]
+
+        # Require a short, recognizable heading immediately before
+        # the factual sentence; never merge ordinary adjacent sentences.
+        if len(heading.text) > 180:
+            continue
+        if _HEADING_LINE.search(heading.text) is None:
+            continue
+        if not any(character.isalpha() for character in fact.text):
+            continue
+
+        add(
+            heading.start_char,
+            fact.end_char,
+            fact.sentence_index,
+        )
+
+        # An initial document title may resolve a later "the Court"-
+        # style reference. The entire intervening text stays in the
+        # exact cited slice, and the 1000-character bound still applies.
+        if (
+            fact_index >= 2
+            and sentences[0].start_char == 0
+            and _looks_like_document_title(chunk.content)
+        ):
+            add(0, fact.end_char, fact.sentence_index)
+
+    return tuple(expanded)
+
+
 class SentenceEvidenceVerificationService:
     def __init__(
         self,
         *,
         verifier: EntailmentVerifierPort,
+        contextual_fallback: bool = False,
     ) -> None:
         self._verifier = verifier
+        self._contextual_fallback = contextual_fallback
 
     def verify(
         self,
@@ -214,6 +305,50 @@ class SentenceEvidenceVerificationService:
                 strict=True,
             )
         )
+
+        # Preserve the original single-sentence decision whenever
+        # at least one original sentence independently entails the claim.
+        if (
+            self._contextual_fallback
+            and not any(span.is_supporting for span in spans)
+        ):
+            contextual = tuple(
+                candidate
+                for chunk in evidence
+                for candidate in _contextual_candidates(chunk)
+            )
+
+            if contextual:
+                contextual_scores = self._verifier.score(
+                    claim=cleaned_claim,
+                    premises=tuple(
+                        candidate.text for candidate in contextual
+                    ),
+                )
+
+                if len(contextual_scores) != len(contextual):
+                    raise RuntimeError(
+                        "Entailment verifier returned "
+                        "an unexpected number of scores."
+                    )
+
+                contextual_spans = tuple(
+                    EvidenceSpan(
+                        chunk=candidate.chunk,
+                        sentence_index=candidate.sentence_index,
+                        start_char=candidate.start_char,
+                        end_char=candidate.end_char,
+                        text=candidate.text,
+                        verification=score,
+                    )
+                    for candidate, score in zip(
+                        contextual,
+                        contextual_scores,
+                        strict=True,
+                    )
+                )
+
+                spans = spans + contextual_spans
 
         return EvidenceVerificationResult(
             claim=cleaned_claim,
