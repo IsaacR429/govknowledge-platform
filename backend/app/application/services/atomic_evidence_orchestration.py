@@ -24,6 +24,9 @@ from app.application.services.atomic_evidence_policy import (
 from app.application.services.authorized_search import (
     AuthorizedSearchService,
 )
+from app.application.services.claim_provenance import (
+    ClaimOrigin,
+)
 from app.application.services.sentence_evidence_verification import (
     EvidenceVerificationResult,
     SentenceEvidenceVerificationService,
@@ -38,6 +41,7 @@ from app.domain.enums.audit import (
 class AtomicClaim:
     claim_id: str
     text: str
+    origin: ClaimOrigin
     language: str = "fr"
     required: bool = True
 
@@ -55,6 +59,20 @@ class AtomicClaim:
         if not self.language.strip():
             raise ValueError(
                 "Atomic claim language cannot be empty."
+            )
+
+        if self.text.strip() != self.origin.text:
+            raise ValueError(
+                "Atomic claim must match its validated origin."
+            )
+
+        if (
+            self.language.strip().lower()
+            != self.origin.language.strip().lower()
+        ):
+            raise ValueError(
+                "Atomic claim language must match "
+                "its validated origin."
             )
 
 

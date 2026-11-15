@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
@@ -24,6 +24,11 @@ class AuthorizationScope:
 
 
 class AuthorizationRepository(Protocol):
+    def active_document_ids(
+        self,
+    ) -> frozenset[UUID]:
+        ...
+
     def document_ids_for_user(
         self,
         user_id: UUID,

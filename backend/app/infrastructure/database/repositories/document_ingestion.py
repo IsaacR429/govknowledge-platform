@@ -73,7 +73,10 @@ class PostgresDocumentIngestionRepository(
         self._db.add(job)
 
         try:
-            self._db.commit()
+            # Stage the document, version and job in
+            # the current transaction. The ingestion
+            # audit will commit them atomically.
+            self._db.flush()
         except Exception:
             self._db.rollback()
             raise

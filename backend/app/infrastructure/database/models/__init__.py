@@ -26,7 +26,12 @@ from app.infrastructure.database.models.processing import (
     DocumentProcessingJob,
 )
 
+from app.infrastructure.database.models.table_evidence import (
+    TableEvidenceRecord,
+)
+
 __all__ = [
+    "TableEvidenceRecord",
     "AuditEventRecord",
     "ChunkEmbedding",
     "AuthSession",

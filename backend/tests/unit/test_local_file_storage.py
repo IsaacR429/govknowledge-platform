@@ -1,4 +1,4 @@
-﻿from hashlib import sha256
+from hashlib import sha256
 from io import BytesIO
 from uuid import uuid4
 
@@ -80,6 +80,10 @@ def test_ingestion_removes_file_when_repository_fails(
                 "Simulated database failure"
             )
 
+    class DummyAuditService:
+        def record(self, event):
+            pass
+
     storage = LocalFileStorage(
         tmp_path / "documents"
     )
@@ -87,6 +91,7 @@ def test_ingestion_removes_file_when_repository_fails(
     service = DocumentIngestionService(
         repository=FailingRepository(),
         storage=storage,
+        audit=DummyAuditService(),
     )
 
     request = CreateDocumentRequest(
@@ -111,6 +116,8 @@ def test_ingestion_removes_file_when_repository_fails(
         service.create_initial_upload(
             request=request,
             source=BytesIO(b"temporary"),
+            actor_user_id=uuid4(),
+            correlation_id=uuid4(),
         )
 
     remaining_files = [

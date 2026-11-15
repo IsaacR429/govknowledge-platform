@@ -25,7 +25,10 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import document_processing as processing_dependencies
+from app.api.dependencies import qa as qa_dependencies
 from app.api.dependencies.qa import get_question_answer_service
+from app.api.routes import documents as document_routes
 from app.application.ports.question_claim_planner import PlannedClaim
 from app.application.services.audit import AuditService
 from app.application.services.authorization import AuthorizationService
@@ -38,6 +41,7 @@ from app.application.services.validated_citations import ValidatedCitationSet
 from app.core.config import get_settings
 from app.domain.enums.permission import PermissionAction
 from app.domain.enums.processing import ProcessingStatus
+from app.infrastructure.database.models.audit import AuditEventRecord
 from app.infrastructure.database.models.authentication import (
     AuthSession,
     LocalCredential,
@@ -52,8 +56,9 @@ from app.infrastructure.database.models.embeddings import (
     ChunkEmbedding,
     EMBEDDING_DIMENSION,
 )
-from app.infrastructure.database.models.identity import User
+from app.infrastructure.database.models.identity import Role, User
 from app.infrastructure.database.models.permissions import DocumentPermission
+from app.infrastructure.database.models.processing import DocumentProcessingJob
 from app.infrastructure.database.repositories.authorization import (
     PostgresAuthorizationRepository,
 )
@@ -333,9 +338,10 @@ def _seed(
     db.commit()
 
 
-def _cleanup(*, user_id, allowed, secret) -> None:
+def _cleanup(*, user_id, employee_id, allowed, secret) -> None:
     """Delete only this test's UUIDs in foreign-key-safe order."""
     specs = (allowed, secret)
+    test_user_ids = [user_id, employee_id]
 
     document_ids = [item[0] for item in specs]
     version_ids = [item[1] for item in specs]
@@ -345,23 +351,30 @@ def _cleanup(*, user_id, allowed, secret) -> None:
 
     with SessionLocal() as db:
         db.execute(
+            delete(AuditEventRecord).where(
+                AuditEventRecord.actor_user_id.in_(test_user_ids),
+                AuditEventRecord.document_id.in_(document_ids),
+            )
+        )
+        db.execute(
             delete(AuthSession).where(
-                AuthSession.user_id == user_id
+                AuthSession.user_id.in_(test_user_ids)
             )
         )
         db.execute(
             delete(LocalCredential).where(
-                LocalCredential.user_id == user_id
+                LocalCredential.user_id.in_(test_user_ids)
             )
         )
         db.execute(
             delete(ChunkEmbedding).where(
-                ChunkEmbedding.id.in_(embedding_ids)
+                ChunkEmbedding.chunk_id.in_(chunk_ids)
+                | ChunkEmbedding.id.in_(embedding_ids)
             )
         )
         db.execute(
             delete(DocumentPermission).where(
-                DocumentPermission.user_id == user_id
+                DocumentPermission.user_id.in_(test_user_ids)
             )
         )
         db.execute(
@@ -372,6 +385,11 @@ def _cleanup(*, user_id, allowed, secret) -> None:
         db.execute(
             delete(DocumentPage).where(
                 DocumentPage.id.in_(page_ids)
+            )
+        )
+        db.execute(
+            delete(DocumentProcessingJob).where(
+                DocumentProcessingJob.document_version_id.in_(version_ids)
             )
         )
         db.execute(
@@ -386,16 +404,17 @@ def _cleanup(*, user_id, allowed, secret) -> None:
         )
         db.execute(
             delete(User).where(
-                User.id == user_id
+                User.id.in_(test_user_ids)
             )
         )
         db.commit()
 
 
-def test_real_login_and_acl_restrict_qa_discovery():
+def test_real_login_and_acl_restrict_qa_discovery(monkeypatch):
     _assert_isolated_target()
 
     user_id = uuid4()
+    employee_id = uuid4()
 
     # Authorized vector has similarity 0.8 to the query.
     allowed = (
@@ -422,6 +441,7 @@ def test_real_login_and_acl_restrict_qa_discovery():
     )
 
     password = secrets.token_urlsafe(24)
+    employee_password = secrets.token_urlsafe(24)
     password_hash = PasswordHash.recommended().hash(password)
 
     embedding = FixedEmbedding()
@@ -454,15 +474,71 @@ def test_real_login_and_acl_restrict_qa_discovery():
                 password_hash=password_hash,
             )
 
+        # Give the generated test user the real ADMIN role.
+        # This is needed to exercise the grant/revoke HTTP endpoints.
+        with SessionLocal() as db:
+            admin_role = db.scalar(
+                select(Role).where(Role.name == "ADMIN")
+            )
+
+            if admin_role is None:
+                admin_role = Role(
+                    id=uuid4(),
+                    name="ADMIN",
+                    description="Isolated integration-test role",
+                )
+                db.add(admin_role)
+                db.flush()
+
+            admin_user = db.get(User, user_id)
+            admin_user.roles.append(admin_role)
+
+            employee_role = db.scalar(
+                select(Role).where(Role.name == "EMPLOYEE")
+            )
+            if employee_role is None:
+                employee_role = Role(
+                    id=uuid4(),
+                    name="EMPLOYEE",
+                    description="Isolated integration-test role",
+                )
+                db.add(employee_role)
+                db.flush()
+
+            employee = User(
+                id=employee_id,
+                username=f"isolated-employee-{employee_id.hex}",
+                display_name="Isolation Test Employee",
+                email=None,
+                department="Test",
+                language_preference="fr",
+                is_active=True,
+                roles=[employee_role],
+            )
+            db.add(employee)
+            db.flush()
+
+            db.add(
+                LocalCredential(
+                    user_id=employee_id,
+                    password_hash=PasswordHash.recommended().hash(
+                        employee_password
+                    ),
+                )
+            )
+            db.commit()
+
         app = create_app()
 
         def override_qa_service(
             db: Annotated[Session, Depends(get_db)],
         ):
+            auth_service = AuthorizationService(
+                PostgresAuthorizationRepository(db)
+            )
+
             real_search = AuthorizedSearchService(
-                authorization=AuthorizationService(
-                    PostgresAuthorizationRepository(db)
-                ),
+                authorization=auth_service,
                 embedding_provider=embedding,
                 retrieval=PostgresVectorRetrievalAdapter(db),
             )
@@ -472,6 +548,7 @@ def test_real_login_and_acl_restrict_qa_discovery():
                 planner=planner,
                 evidence=evidence,
                 answer=answer,
+                authorization=auth_service,
                 audit=AuditService(memory_audit),
                 discovery_top_k=5,
             )
@@ -494,6 +571,11 @@ def test_real_login_and_acl_restrict_qa_discovery():
         qa_url = f"{prefix}/qa"
         me_url = f"{prefix}/me"
         logout_url = f"{prefix}/auth/logout"
+        permission_url = (
+            f"{prefix}/documents/{allowed[0]}"
+            f"/permissions/read/{user_id}"
+        )
+        source_page_url = f"{prefix}/source-pages/{allowed[2]}"
 
         with TestClient(app) as client:
             # 1. No token: reject before model work.
@@ -569,21 +651,32 @@ def test_real_login_and_acl_restrict_qa_discovery():
             assert len(evidence.calls) == 1
             assert evidence.calls[0][1] == ()
 
-            # Grant READ permission only for the weaker
-            # authorized document.
-            with SessionLocal() as db:
-                db.add(
-                    DocumentPermission(
-                        id=uuid4(),
-                        user_id=user_id,
-                        document_id=allowed[0],
-                        action=PermissionAction.READ.value,
-                    )
-                )
-                db.commit()
+            no_page_access = client.get(
+                source_page_url,
+                headers=bearer,
+            )
+            assert no_page_access.status_code == 404
+
+            # Grant access through the real administrator API.
+            grant = client.post(
+                permission_url,
+                headers=bearer,
+            )
+
+            assert grant.status_code == 200, grant.text
+            assert grant.json()["changed"] is True
+            assert grant.json()["permission"] == "READ"
 
             # 6. Strongest vector is unauthorized.
             # Only authorized evidence reaches planning.
+            permitted_page = client.get(
+                source_page_url,
+                headers=bearer,
+            )
+            assert permitted_page.status_code == 200, permitted_page.text
+            assert permitted_page.json()["page_id"] == str(allowed[2])
+            assert permitted_page.json()["extracted_text"] == ALLOWED_TEXT
+
             permitted = client.post(
                 qa_url,
                 json=question,
@@ -612,15 +705,138 @@ def test_real_login_and_acl_restrict_qa_discovery():
             assert len(evidence.calls[1][1]) == 1
             assert evidence.calls[1][1][0].text == FACT
 
-            # 7. Revoking permission takes effect
-            # for the SAME still-valid session.
+            # A second, authenticated employee cannot access the
+            # document while the administrator's READ grant is active.
+            employee_login = client.post(
+                login_url,
+                json={
+                    "username": f"isolated-employee-{employee_id.hex}",
+                    "password": employee_password,
+                },
+            )
+            assert employee_login.status_code == 200, employee_login.text
+
+            employee_bearer = {
+                "Authorization": (
+                    f"Bearer {employee_login.json()['access_token']}"
+                )
+            }
+
+            employee_me = client.get(me_url, headers=employee_bearer)
+            assert employee_me.status_code == 200
+            assert employee_me.json()["user_id"] == str(employee_id)
+            assert employee_me.json()["roles"] == ["EMPLOYEE"]
+
+            # An employee cannot grant themselves READ access.
+            employee_grant_attempt = client.post(
+                (
+                    f"{prefix}/documents/{allowed[0]}"
+                    f"/permissions/read/{employee_id}"
+                ),
+                headers=employee_bearer,
+            )
+            assert employee_grant_attempt.status_code == 403, (
+                employee_grant_attempt.text
+            )
+
+            employee_page = client.get(
+                source_page_url,
+                headers=employee_bearer,
+            )
+            assert employee_page.status_code == 404
+
+            employee_qa = client.post(
+                qa_url,
+                json=question,
+                headers=employee_bearer,
+            )
+            assert employee_qa.status_code == 200, employee_qa.text
+            assert employee_qa.json()["status"] == "INSUFFICIENT_EVIDENCE"
+            assert employee_qa.json()["citations"] == []
+            assert FACT not in employee_qa.json()["answer"]
+            assert SECRET_TEXT not in employee_qa.json()["answer"]
+
+            # The employee's request must not reach embedding or planning.
+            assert len(embedding.calls) == 1
+            assert len(planner.calls) == 1
+            assert len(evidence.calls) == 3
+            assert evidence.calls[2][1] == ()
+
+            # Exercise the retry HTTP endpoint without running an
+            # actual embedding task in this authorization test.
+            retry_job_id = uuid4()
             with SessionLocal() as db:
-                db.execute(
-                    delete(DocumentPermission).where(
-                        DocumentPermission.user_id == user_id
+                db.add(
+                    DocumentProcessingJob(
+                        id=retry_job_id,
+                        document_version_id=allowed[1],
+                        status="SUCCEEDED",
+                        parsing_status="SUCCESS",
+                        attempt_number=1,
+                        indexing_status="FAILED",
+                        indexing_attempt_number=1,
+                        indexing_error_code="INDEXING_FAILED",
                     )
                 )
                 db.commit()
+
+            scheduled_retries = []
+
+            def record_retry(job_id, version_id):
+                scheduled_retries.append((job_id, version_id))
+
+            monkeypatch.setattr(
+                document_routes,
+                "run_document_indexing_retry",
+                record_retry,
+            )
+
+            retry_url = (
+                f"{prefix}/documents/jobs/{retry_job_id}/retry-indexing"
+            )
+
+            # A non-admin cannot request a retry.
+            employee_retry = client.post(
+                retry_url,
+                headers=employee_bearer,
+            )
+            assert employee_retry.status_code == 403, employee_retry.text
+            assert scheduled_retries == []
+
+            # The administrator claims the failed job.
+            accepted_retry = client.post(
+                retry_url,
+                headers=bearer,
+            )
+            assert accepted_retry.status_code == 202, accepted_retry.text
+            assert accepted_retry.json()["retry_accepted"] is True
+            assert accepted_retry.json()["indexing_status"] == "INDEXING"
+            assert scheduled_retries == [(retry_job_id, allowed[1])]
+
+            # A second request must not schedule another retry.
+            duplicate_retry = client.post(
+                retry_url,
+                headers=bearer,
+            )
+            assert duplicate_retry.status_code == 409
+            assert scheduled_retries == [(retry_job_id, allowed[1])]
+
+            with SessionLocal() as db:
+                retry_job = db.get(DocumentProcessingJob, retry_job_id)
+                assert retry_job.indexing_status == "INDEXING"
+                assert retry_job.indexing_attempt_number == 2
+                assert retry_job.indexing_error_code is None
+
+            # 7. Revoking permission takes effect
+            # for the SAME still-valid session.
+            revoke = client.delete(
+                permission_url,
+                headers=bearer,
+            )
+
+            assert revoke.status_code == 200, revoke.text
+            assert revoke.json()["changed"] is True
+            assert revoke.json()["permission"] == "READ"
 
             revoked_acl = client.post(
                 qa_url,
@@ -636,8 +852,14 @@ def test_real_login_and_acl_restrict_qa_discovery():
 
             assert len(planner.calls) == 1
             assert len(embedding.calls) == 1
-            assert len(evidence.calls) == 3
-            assert evidence.calls[2][1] == ()
+            assert len(evidence.calls) == 4
+            assert evidence.calls[3][1] == ()
+
+            revoked_page = client.get(
+                source_page_url,
+                headers=bearer,
+            )
+            assert revoked_page.status_code == 404
 
             # 8. Logout invalidates the real session.
             logout = client.post(
@@ -663,13 +885,31 @@ def test_real_login_and_acl_restrict_qa_discovery():
         assert memory_audit.events == []
 
         with SessionLocal() as db:
-            assert db.scalar(
-                text("SELECT count(*) FROM audit_events")
-            ) == 0
+            permission_events = db.scalars(
+                select(AuditEventRecord).where(
+                    AuditEventRecord.actor_user_id == user_id,
+                    AuditEventRecord.document_id == allowed[0],
+                    AuditEventRecord.event_type.in_(
+                        ["DOCUMENT_READ_GRANTED", "DOCUMENT_READ_REVOKED"]
+                    ),
+                )
+            ).all()
+
+            assert sorted(
+                event.event_type for event in permission_events
+            ) == [
+                "DOCUMENT_READ_GRANTED",
+                "DOCUMENT_READ_REVOKED",
+            ]
+            assert all(
+                event.outcome == "SUCCEEDED"
+                for event in permission_events
+            )
 
     finally:
         _cleanup(
             user_id=user_id,
+            employee_id=employee_id,
             allowed=allowed,
             secret=secret,
         )
@@ -687,3 +927,214 @@ def test_real_login_and_acl_restrict_qa_discovery():
         assert db.scalar(
             select(func.count()).select_from(AuthSession)
         ) == 0
+
+
+def test_indexing_failure_is_durable_after_parsing(monkeypatch):
+    _assert_isolated_target()
+
+    user_id = uuid4()
+    employee_id = uuid4()
+    job_id = uuid4()
+
+    allowed = (
+        uuid4(), uuid4(), uuid4(), uuid4(), uuid4(),
+        "Indexing Failure Test", ALLOWED_TEXT,
+        _unit_vector(0.8, 0.6),
+    )
+    secret = (
+        uuid4(), uuid4(), uuid4(), uuid4(), uuid4(),
+        "Second Test Document", SECRET_TEXT,
+        _unit_vector(1.0, 0.0),
+    )
+
+    try:
+        with SessionLocal() as db:
+            assert db.scalar(
+                select(func.count()).select_from(Document)
+            ) == 0
+
+            _seed(
+                db,
+                user_id=user_id,
+                allowed=allowed,
+                secret=secret,
+                password_hash=PasswordHash.recommended().hash(
+                    secrets.token_urlsafe(24)
+                ),
+            )
+
+            # Leave the parsed chunk without an embedding.
+            db.execute(
+                delete(ChunkEmbedding).where(
+                    ChunkEmbedding.id == allowed[4]
+                )
+            )
+
+            # Represent a job whose parsing has already succeeded.
+            db.add(
+                DocumentProcessingJob(
+                    id=job_id,
+                    document_version_id=allowed[1],
+                    status="SUCCEEDED",
+                    parsing_status="SUCCESS",
+                    attempt_number=1,
+                )
+            )
+            db.commit()
+
+        process_calls = []
+
+        def fake_completed_parsing(self, request):
+            process_calls.append(request.processing_job_id)
+            return SimpleNamespace(
+                version_id=allowed[1],
+                chunk_count=1,
+            )
+
+        def failing_embedding_provider():
+            raise RuntimeError("SIMULATED_EMBEDDING_PROVIDER_OUTAGE")
+
+        # Exercise the worker's post-parsing handoff without
+        # opening a PDF, loading a model, or writing a file.
+        monkeypatch.setattr(
+            processing_dependencies.DocumentProcessingService,
+            "process",
+            fake_completed_parsing,
+        )
+        monkeypatch.setattr(
+            processing_dependencies,
+            "LocalFileStorage",
+            lambda _root: object(),
+        )
+        monkeypatch.setattr(
+            qa_dependencies,
+            "get_qa_embedding_provider",
+            failing_embedding_provider,
+        )
+
+        processing_dependencies.run_document_processing_job(
+            job_id,
+            object(),
+        )
+
+        assert process_calls == [job_id]
+
+        # A NEW session must see the committed failure state.
+        with SessionLocal() as db:
+            job = db.get(DocumentProcessingJob, job_id)
+            version = db.get(DocumentVersion, allowed[1])
+
+            assert job is not None
+            assert version is not None
+            assert job.status == "SUCCEEDED"
+            assert job.parsing_status == "SUCCESS"
+            assert version.processing_status == "SUCCEEDED"
+
+            assert job.indexing_status == "FAILED"
+            assert job.indexing_attempt_number == 1
+            assert job.indexing_error_code == "INDEXING_FAILED"
+
+            assert db.scalar(
+                select(func.count())
+                .select_from(ChunkEmbedding)
+                .where(ChunkEmbedding.chunk_id == allowed[3])
+            ) == 0
+
+        # Claim the failed job without parsing the document again.
+        claimed_version = processing_dependencies._claim_indexing_retry(job_id)
+        assert claimed_version == allowed[1]
+
+        # A job already in INDEXING cannot be claimed a second time.
+        assert processing_dependencies._claim_indexing_retry(job_id) is None
+
+        with SessionLocal() as db:
+            job = db.get(DocumentProcessingJob, job_id)
+            assert job.indexing_status == "INDEXING"
+            assert job.indexing_attempt_number == 2
+            assert job.indexing_error_code is None
+
+        # The provider is still monkeypatched to fail.
+        processing_dependencies.run_document_indexing_retry(
+            job_id,
+            allowed[1],
+        )
+
+        # Verify the failed retry from a fresh database session.
+        with SessionLocal() as db:
+            job = db.get(DocumentProcessingJob, job_id)
+            assert job.status == "SUCCEEDED"
+            assert job.parsing_status == "SUCCESS"
+            assert job.indexing_status == "FAILED"
+            assert job.indexing_attempt_number == 2
+            assert job.indexing_error_code == "INDEXING_FAILED"
+
+        # Neither retry should have invoked the parser.
+        assert process_calls == [job_id]
+
+        # The embedding provider recovers. Use deterministic vectors,
+        # not a downloaded model or an external API.
+        class WorkingEmbeddingProvider:
+            model_name = MODEL_NAME
+            model_revision = MODEL_REVISION
+            dimension = EMBEDDING_DIMENSION
+
+            def embed_passages(self, texts):
+                assert list(texts) == [ALLOWED_TEXT]
+                return tuple(
+                    SimpleNamespace(
+                        values=tuple(_unit_vector(0.8, 0.6)),
+                        model_name=self.model_name,
+                        model_revision=self.model_revision,
+                        dimension=self.dimension,
+                    )
+                    for _ in texts
+                )
+
+        monkeypatch.setattr(
+            qa_dependencies,
+            "get_qa_embedding_provider",
+            lambda: WorkingEmbeddingProvider(),
+        )
+
+        # Third attempt: reuse the existing parsed version.
+        assert (
+            processing_dependencies._claim_indexing_retry(job_id)
+            == allowed[1]
+        )
+        processing_dependencies.run_document_indexing_retry(
+            job_id,
+            allowed[1],
+        )
+
+        # Verify the successful outcome and persisted embedding
+        # using a fresh database session.
+        with SessionLocal() as db:
+            job = db.get(DocumentProcessingJob, job_id)
+            version = db.get(DocumentVersion, allowed[1])
+
+            assert job.indexing_status == "SUCCEEDED"
+            assert job.indexing_attempt_number == 3
+            assert job.indexing_error_code is None
+            assert job.status == "SUCCEEDED"
+            assert job.parsing_status == "SUCCESS"
+            assert version.processing_status == "SUCCEEDED"
+
+            embeddings = db.scalars(
+                select(ChunkEmbedding).where(
+                    ChunkEmbedding.chunk_id == allowed[3],
+                    ChunkEmbedding.model_name == MODEL_NAME,
+                    ChunkEmbedding.model_revision == MODEL_REVISION,
+                )
+            ).all()
+            assert len(embeddings) == 1
+
+        # No retry has invoked the parser.
+        assert process_calls == [job_id]
+
+    finally:
+        _cleanup(
+            user_id=user_id,
+            employee_id=employee_id,
+            allowed=allowed,
+            secret=secret,
+        )

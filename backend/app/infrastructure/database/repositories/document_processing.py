@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
@@ -11,6 +13,23 @@ from app.application.ports.document_processing_repository import (
     DocumentProcessingRepository,
     ProcessingJobAttempt,
     ProcessingTarget,
+)
+from app.application.services.table_evidence_atoms import (
+    TableDocumentContext,
+    TableEvidenceAtomBuilder,
+)
+from app.application.services.table_evidence_compilation import (
+    TableEvidenceCompilationService,
+)
+from app.application.services.table_evidence_guard import (
+    UnapprovedTableEvidenceError,
+    reject_unapproved_table_evidence,
+)
+from app.domain.enums.table import (
+    TableEvidenceLayer,
+)
+from app.infrastructure.database.repositories.table_evidence import (
+    PostgresTableEvidenceRepository,
 )
 from app.domain.enums.processing import (
     ParserFailureClass,
@@ -25,6 +44,9 @@ from app.infrastructure.database.models.documents import (
 )
 from app.infrastructure.database.models.processing import (
     DocumentProcessingJob,
+)
+from app.infrastructure.parsing.reviewed_table_approval import (
+    validate_reviewed_table_evidence,
 )
 
 
@@ -353,6 +375,7 @@ class PostgresDocumentProcessingRepository(
         version_id: UUID,
         processing_job_id: UUID,
         parsed: ParsedDocument,
+        resolve_stored_file: Callable[[str], Path] | None = None,
     ) -> None:
         version, job = self._load(
             version_id=version_id,
@@ -391,6 +414,67 @@ class PostgresDocumentProcessingRepository(
                 "parsed pages."
             )
 
+        # Normal documents pass the existing guard unchanged.
+        # Table evidence requires a complete source-bound validation.
+        try:
+            reject_unapproved_table_evidence(parsed)
+        except UnapprovedTableEvidenceError:
+            if resolve_stored_file is None:
+                raise
+
+            # Resolve the path from the database version, not from
+            # a path supplied by the request or parser.
+            stored_pdf_path = resolve_stored_file(version.storage_path)
+
+            approved_indexes = validate_reviewed_table_evidence(
+                parsed=parsed,
+                stored_pdf_path=stored_pdf_path,
+                version_file_hash=version.file_hash,
+            )
+
+            if len(approved_indexes) != 39:
+                raise ValueError(
+                    "Reviewed table approval did not cover all 39 chunks."
+                )
+
+        physical_table_evidence = tuple(
+            table
+            for table in parsed.table_evidence
+            if (
+                table.layer
+                == TableEvidenceLayer.PHYSICAL
+            )
+        )
+        structural_table_evidence = tuple(
+            table
+            for table in parsed.table_evidence
+            if (
+                table.layer
+                == TableEvidenceLayer.STRUCTURAL
+            )
+        )
+        table_compilation = (
+            TableEvidenceCompilationService()
+            .compile(
+                physical_tables=(
+                    physical_table_evidence
+                ),
+                structural_tables=(
+                    structural_table_evidence
+                ),
+            )
+        )
+        document = self._db.get(
+            Document,
+            document_id,
+        )
+        if document is None:
+            raise ValueError(
+                "Document does not exist."
+            )
+
+        # Only now may page/chunk persistence begin.
+
         page_rows: dict[
             int,
             DocumentPage,
@@ -420,6 +504,65 @@ class PostgresDocumentProcessingRepository(
             # We need database-generated page UUIDs
             # before creating chunk foreign keys.
             self._db.flush()
+
+            table_context = (
+                TableDocumentContext(
+                    document_id=document_id,
+                    document_version_id=(
+                        version_id
+                    ),
+                    page_ids=tuple(
+                        (
+                            page_number,
+                            page.id,
+                        )
+                        for (
+                            page_number,
+                            page,
+                        )
+                        in sorted(
+                            page_rows.items()
+                        )
+                    ),
+                    language=(
+                        document.language
+                    ),
+                )
+            )
+            table_atom_builder = (
+                TableEvidenceAtomBuilder()
+            )
+
+            table_sequences = (
+                table_compilation.sequences
+                or tuple(
+                    (table,)
+                    for table
+                    in table_compilation.tables
+                )
+            )
+
+            table_atoms = tuple(
+                atom
+                for sequence in table_sequences
+                for atom in (
+                    table_atom_builder
+                    .build_sequence(
+                        tables=sequence,
+                        context=table_context,
+                    )
+                )
+            )
+            (
+                PostgresTableEvidenceRepository(
+                    self._db
+                )
+                .replace_version_atoms(
+                    version_id=version_id,
+                    atoms=table_atoms,
+                    commit=False,
+                )
+            )
 
             for parsed_chunk in parsed.chunks:
                 page = page_rows.get(

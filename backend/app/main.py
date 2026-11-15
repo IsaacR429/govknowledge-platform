@@ -1,5 +1,12 @@
 from fastapi import FastAPI
 
+from app.api.routes.audit import (
+    router as audit_router,
+)
+
+from app.api.routes.document_permissions import (
+    router as document_permissions_router,
+)
 from app.api.routes.documents import (
     router as documents_router,
 )
@@ -12,6 +19,9 @@ from app.api.routes.health import (
 )
 from app.api.routes.qa import (
     router as qa_router,
+)
+from app.api.routes.search import (
+    router as search_router,
 )
 from app.api.routes.source_pages import (
     router as source_pages_router,
@@ -52,7 +62,22 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(
+        search_router,
+        prefix=settings.api_prefix,
+    )
+
+    application.include_router(
         documents_router,
+        prefix=settings.api_prefix,
+    )
+
+    application.include_router(
+        document_permissions_router,
+        prefix=settings.api_prefix,
+    )
+
+    application.include_router(
+        audit_router,
         prefix=settings.api_prefix,
     )
 

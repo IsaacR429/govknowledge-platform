@@ -201,6 +201,21 @@ def _run_parse(
     import pymupdf
     import pymupdf4llm
 
+    if __package__:
+        from .pymupdf_table_evidence import (
+            extract_physical_table_evidence,
+        )
+        from .pymupdf_tagged_table_evidence import (
+            extract_structural_table_evidence,
+        )
+    else:
+        from pymupdf_table_evidence import (
+            extract_physical_table_evidence,
+        )
+        from pymupdf_tagged_table_evidence import (
+            extract_structural_table_evidence,
+        )
+
     runtime = {
         "pymupdf4llm_version": version(
             "pymupdf4llm"
@@ -245,11 +260,21 @@ def _run_parse(
         dict[str, object]
     ] = []
 
+    table_evidence: list[
+        dict[str, object]
+    ] = []
+
     chunk_index = 0
 
     with pymupdf.open(
         str(source)
     ) as pdf:
+
+        table_evidence.extend(
+            extract_structural_table_evidence(
+                pdf
+            )
+        )
 
         if len(page_chunks) != pdf.page_count:
             raise ValueError(
@@ -328,6 +353,27 @@ def _run_parse(
                     image_count,
             }
 
+            page_table_evidence = (
+                extract_physical_table_evidence(
+                    pdf_page,
+                    page_number=page_number,
+                )
+            )
+
+            table_evidence.extend(
+                page_table_evidence
+            )
+
+            page_metadata = (
+                metadata.copy()
+            )
+
+            page_metadata[
+                "native_table_count"
+            ] = len(
+                page_table_evidence
+            )
+
             pages.append(
                 {
                     "page_number":
@@ -337,7 +383,7 @@ def _run_parse(
                         text,
 
                     "metadata":
-                        metadata.copy(),
+                        page_metadata,
                 }
             )
 
@@ -380,6 +426,8 @@ def _run_parse(
         {
             "pages": pages,
             "chunks": chunks,
+            "table_evidence_schema_version": 1,
+            "table_evidence": table_evidence,
         },
         runtime,
         worker_setup_ms,

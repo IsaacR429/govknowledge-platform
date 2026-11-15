@@ -592,6 +592,9 @@ def _deserialize_parsed_document(
         ParsedDocument,
         ParsedPage,
     )
+    from app.infrastructure.parsing.table_evidence_transport import (
+        deserialize_table_evidence,
+    )
 
     raw_document = payload.get(
         "parsed_document"
@@ -675,9 +678,14 @@ def _deserialize_parsed_document(
             )
         )
 
+    table_evidence = deserialize_table_evidence(
+        raw_document
+    )
+
     return ParsedDocument(
         pages=tuple(pages),
         chunks=tuple(chunks),
+        table_evidence=table_evidence,
     )
 
 

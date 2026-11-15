@@ -23,6 +23,9 @@ from app.application.services.atomic_evidence_policy import (
 from app.application.services.authorized_search import (
     AuthorizedSearchResult,
 )
+from app.application.services.claim_provenance import (
+    ClaimOrigin,
+)
 from app.application.services.sentence_evidence_verification import (
     SentenceEvidenceVerificationService,
 )
@@ -30,6 +33,32 @@ from app.domain.enums.evidence import (
     EntailmentLabel,
     EvidenceDecision,
 )
+
+
+def make_atomic_claim(
+    claim_id: str,
+    text: str,
+    language: str = "fr",
+    required: bool = True,
+) -> AtomicClaim:
+    return AtomicClaim(
+        claim_id=claim_id,
+        text=text,
+        origin=ClaimOrigin(
+            evidence_id="evidence-1",
+            chunk_id=uuid4(),
+            document_id=uuid4(),
+            document_version_id=uuid4(),
+            page_id=uuid4(),
+            page_number=1,
+            start_char=0,
+            end_char=len(text),
+            text=text,
+            language=language,
+        ),
+        language=language,
+        required=required,
+    )
 
 
 def chunk(
@@ -312,11 +341,11 @@ def test_retrieves_each_atomic_claim_independently():
     ).evaluate(
         identity=identity,
         claims=(
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="A",
                 text=claim_a,
             ),
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="B",
                 text=claim_b,
             ),
@@ -405,11 +434,11 @@ def test_weakest_required_claim_blocks_answer():
     ).evaluate(
         identity=current_identity(),
         claims=(
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="A",
                 text=claim_a,
             ),
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="B",
                 text=claim_b,
             ),
@@ -462,11 +491,11 @@ def test_missing_evidence_for_one_claim_blocks_answer():
     ).evaluate(
         identity=current_identity(),
         claims=(
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="A",
                 text=claim_a,
             ),
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="B",
                 text=claim_b,
             ),
@@ -508,11 +537,11 @@ def test_no_evidence_for_any_claim_returns_no_evidence():
     ).evaluate(
         identity=current_identity(),
         claims=(
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="A",
                 text="A",
             ),
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="B",
                 text="B",
             ),
@@ -558,7 +587,7 @@ def test_only_authorized_search_results_reach_verifier():
     ).evaluate(
         identity=current_identity(),
         claims=(
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="A",
                 text=claim,
             ),
@@ -598,7 +627,7 @@ def test_authorization_failure_is_not_swallowed():
         ).evaluate(
             identity=current_identity(),
             claims=(
-                AtomicClaim(
+                make_atomic_claim(
                     claim_id="restricted",
                     text=claim,
                 ),
@@ -641,7 +670,7 @@ def test_authorization_failure_has_failed_terminal_audit():
         ).evaluate(
             identity=identity,
             claims=(
-                AtomicClaim(
+                make_atomic_claim(
                     claim_id="restricted",
                     text=claim,
                 ),
@@ -753,11 +782,11 @@ def test_multi_claim_authorization_failure_aborts_entire_request():
         ).evaluate(
             identity=current_identity(),
             claims=(
-                AtomicClaim(
+                make_atomic_claim(
                     claim_id="authorized",
                     text=authorized_claim,
                 ),
-                AtomicClaim(
+                make_atomic_claim(
                     claim_id="restricted",
                     text=restricted_claim,
                 ),
@@ -806,11 +835,11 @@ def test_duplicate_claim_ids_fail_before_search():
         orchestrator.evaluate(
             identity=current_identity(),
             claims=(
-                AtomicClaim(
+                make_atomic_claim(
                     claim_id="same",
                     text="A",
                 ),
-                AtomicClaim(
+                make_atomic_claim(
                     claim_id="same",
                     text="B",
                 ),
@@ -826,7 +855,7 @@ def test_empty_claim_text_is_rejected():
         ValueError,
         match="cannot be empty",
     ):
-        AtomicClaim(
+        make_atomic_claim(
             claim_id="A",
             text="   ",
         )
@@ -886,7 +915,7 @@ def test_orchestration_audits_single_correlated_operation():
     ).evaluate(
         identity=identity,
         claims=(
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="A",
                 text=claim_text,
             ),
@@ -972,7 +1001,7 @@ def test_insufficient_evidence_is_audited_once():
     ).evaluate(
         identity=current_identity(),
         claims=(
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="A",
                 text=claim_text,
             ),
@@ -1019,7 +1048,7 @@ def test_initial_audit_failure_blocks_retrieval():
         ).evaluate(
             identity=current_identity(),
             claims=(
-                AtomicClaim(
+                make_atomic_claim(
                     claim_id="A",
                     text="Claim",
                 ),
@@ -1068,7 +1097,7 @@ def test_final_audit_failure_blocks_result_return():
         ).evaluate(
             identity=current_identity(),
             claims=(
-                AtomicClaim(
+                make_atomic_claim(
                     claim_id="A",
                     text=claim_text,
                 ),
@@ -1117,7 +1146,7 @@ def test_cross_language_evidence_is_not_sent_to_nli():
     ).evaluate(
         identity=current_identity(),
         claims=(
-            AtomicClaim(
+            make_atomic_claim(
                 claim_id="A",
                 text=claim_text,
                 language="fr",

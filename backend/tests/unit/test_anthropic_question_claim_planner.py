@@ -83,6 +83,7 @@ def planning_request(
     if evidence is None:
         evidence = (
             ClaimPlanningEvidence(
+                evidence_id="evidence-1",
                 chunk_id=uuid4(),
                 language="en",
                 content=ENGLISH_EVIDENCE,
@@ -108,7 +109,10 @@ def test_returns_valid_planned_claim():
                     text=json.dumps(
                         {
                             "claims": [
-                                ENGLISH_EVIDENCE
+                                {
+                                    "evidence_id": "evidence-1",
+                                    "quote": ENGLISH_EVIDENCE,
+                                }
                             ]
                         }
                     )
@@ -128,6 +132,11 @@ def test_returns_valid_planned_claim():
     )
 
     assert len(result) == 1
+
+    assert (
+        result[0].evidence_id
+        == "evidence-1"
+    )
 
     assert (
         result[0].text
@@ -152,12 +161,14 @@ def test_only_matching_language_evidence_is_sent():
     )
 
     french_chunk = ClaimPlanningEvidence(
+        evidence_id="evidence-fr",
         chunk_id=uuid4(),
         language="fr",
         content=french_evidence,
     )
 
     english_chunk = ClaimPlanningEvidence(
+        evidence_id="evidence-1",
         chunk_id=uuid4(),
         language="en",
         content=ENGLISH_EVIDENCE,
@@ -170,7 +181,10 @@ def test_only_matching_language_evidence_is_sent():
                     text=json.dumps(
                         {
                             "claims": [
-                                ENGLISH_EVIDENCE
+                                {
+                                    "evidence_id": "evidence-1",
+                                    "quote": ENGLISH_EVIDENCE,
+                                }
                             ]
                         }
                     )
@@ -210,9 +224,16 @@ def test_only_matching_language_evidence_is_sent():
     ) == 1
 
     assert (
+        payload["evidence"][0]["evidence_id"]
+        == "evidence-1"
+    )
+
+    assert (
         payload["evidence"][0]["content"]
         == ENGLISH_EVIDENCE
     )
+
+    assert "chunk_id" not in payload["evidence"][0]
 
     assert (
         french_evidence
@@ -222,6 +243,7 @@ def test_only_matching_language_evidence_is_sent():
 
 def test_no_matching_language_evidence_skips_provider():
     french_chunk = ClaimPlanningEvidence(
+        evidence_id="evidence-fr",
         chunk_id=uuid4(),
         language="fr",
         content=(
@@ -260,6 +282,7 @@ def test_prompt_injection_remains_untrusted_data():
     )
 
     malicious_chunk = ClaimPlanningEvidence(
+        evidence_id="evidence-bad",
         chunk_id=uuid4(),
         language="en",
         content=malicious,
@@ -310,6 +333,11 @@ def test_prompt_injection_remains_untrusted_data():
     )
 
     assert (
+        payload["evidence"][0]["evidence_id"]
+        == "evidence-bad"
+    )
+
+    assert (
         payload["evidence"][0]["content"]
         == malicious
     )
@@ -341,7 +369,10 @@ def test_invalid_json_is_rejected():
 
 def test_too_many_claims_are_rejected():
     claims = [
-        f"Claim {index}"
+        {
+            "evidence_id": f"evidence-{index}",
+            "quote": f"Claim {index}",
+        }
         for index in range(
             MAX_PLANNED_CLAIMS + 1
         )
@@ -382,8 +413,80 @@ def test_duplicate_claims_are_rejected():
                     text=json.dumps(
                         {
                             "claims": [
-                                ENGLISH_EVIDENCE,
-                                ENGLISH_EVIDENCE,
+                                {
+                                    "evidence_id": "evidence-1",
+                                    "quote": ENGLISH_EVIDENCE,
+                                },
+                                {
+                                    "evidence_id": "evidence-1",
+                                    "quote": ENGLISH_EVIDENCE,
+                                },
+                            ]
+                        }
+                    )
+                )
+            ]
+        )
+    )
+
+    planner = AnthropicQuestionClaimPlanner(
+        client=client,
+        model="test-model",
+    )
+
+    with pytest.raises(
+        AnthropicQuestionClaimPlannerResponseError
+    ):
+        planner.plan(
+            planning_request()
+        )
+
+
+def test_claim_with_missing_evidence_id_is_rejected():
+    client = FakeClient(
+        FakeMessage(
+            content=[
+                FakeTextBlock(
+                    text=json.dumps(
+                        {
+                            "claims": [
+                                {
+                                    "quote": ENGLISH_EVIDENCE,
+                                }
+                            ]
+                        }
+                    )
+                )
+            ]
+        )
+    )
+
+    planner = AnthropicQuestionClaimPlanner(
+        client=client,
+        model="test-model",
+    )
+
+    with pytest.raises(
+        AnthropicQuestionClaimPlannerResponseError
+    ):
+        planner.plan(
+            planning_request()
+        )
+
+
+def test_claim_with_extra_provenance_fields_is_rejected():
+    client = FakeClient(
+        FakeMessage(
+            content=[
+                FakeTextBlock(
+                    text=json.dumps(
+                        {
+                            "claims": [
+                                {
+                                    "evidence_id": "evidence-1",
+                                    "quote": ENGLISH_EVIDENCE,
+                                    "start_char": 10,
+                                }
                             ]
                         }
                     )

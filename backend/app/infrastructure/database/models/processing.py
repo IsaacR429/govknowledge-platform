@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import (
@@ -75,6 +75,15 @@ class DocumentProcessingJob(
             ")",
             name="ck_processing_job_parser_outcome",
         ),
+        CheckConstraint(
+            "indexing_status IS NULL OR indexing_status IN "
+            "('PENDING', 'INDEXING', 'SUCCEEDED', 'FAILED', 'NO_CHUNKS')",
+            name="ck_processing_job_indexing_status",
+        ),
+        CheckConstraint(
+            "indexing_attempt_number >= 0",
+            name="ck_processing_job_indexing_attempt_nonnegative",
+        ),
     )
 
     document_version_id: Mapped[UUID] = mapped_column(
@@ -131,5 +140,25 @@ class DocumentProcessingJob(
 
     parser_lineage_json: Mapped[dict | None] = mapped_column(
         JSONB,
+        nullable=True,
+    )
+
+    # Separate from parsing: a parsed version may fail indexing.
+    # NULL means indexing was not tracked for a historical job.
+    indexing_status: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    indexing_attempt_number: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
+    # Store a safe error code, not raw provider exceptions or credentials.
+    indexing_error_code: Mapped[str | None] = mapped_column(
+        String(100),
         nullable=True,
     )

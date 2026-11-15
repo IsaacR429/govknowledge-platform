@@ -1,4 +1,4 @@
-﻿from uuid import UUID
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,6 +25,24 @@ class PostgresAuthorizationRepository(
         db: Session,
     ) -> None:
         self._db = db
+
+    def active_document_ids(
+        self,
+    ) -> frozenset[UUID]:
+        statement = (
+            select(Document.id)
+            .where(
+                Document.status == "ACTIVE"
+            )
+        )
+
+        document_ids = self._db.scalars(
+            statement
+        ).all()
+
+        return frozenset(
+            document_ids
+        )
 
     def document_ids_for_user(
         self,

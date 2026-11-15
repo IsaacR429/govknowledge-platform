@@ -135,6 +135,105 @@ def _sentence_candidates(
     )
 
 
+def _markdown_test_row_candidates(
+    chunk: RetrievedChunk,
+    claim: str,
+) -> tuple[_SentenceCandidate, ...] | None:
+    """Return exact source rows for a T-### claim.
+
+    None means this chunk has no recognized Markdown table,
+    so ordinary sentence verification may proceed.
+
+    An empty tuple means a table was found, but no single
+    unambiguous row supports checking this claim.
+    """
+    lines: list[tuple[int, str]] = []
+    offset = 0
+
+    for raw_line in chunk.content.splitlines(keepends=True):
+        line = raw_line.rstrip("\r\n")
+        lines.append((offset, line))
+        offset += len(raw_line)
+
+    table_found = False
+    matches: list[_SentenceCandidate] = []
+
+    for index in range(len(lines) - 1):
+        _, header = lines[index]
+        _, divider = lines[index + 1]
+
+        if not header.strip().startswith("|"):
+            continue
+
+        # Recognize a Markdown header followed by its separator.
+        separator_cells = divider.strip().strip("|").split("|")
+        if (
+            len(separator_cells) < 2
+            or not all(
+                re.fullmatch(r":?-{3,}:?", cell.strip())
+                for cell in separator_cells
+            )
+        ):
+            continue
+
+        table_found = True
+        row_index = index + 2
+
+        while row_index < len(lines):
+            line_start, line = lines[row_index]
+            row_text = line.strip()
+
+            if not (
+                row_text.startswith("|")
+                and row_text.endswith("|")
+            ):
+                break
+
+            first_cell = (
+                row_text.strip("|").split("|", 1)[0]
+                .strip()
+                .strip("*_` ")
+            )
+
+            claim_ids = {
+                value.upper()
+                for value in re.findall(
+                    r"(?<![\w-])T-\d+(?![\w-])",
+                    claim,
+                    flags=re.IGNORECASE,
+                )
+            }
+
+            if (
+                len(claim_ids) == 1
+                and first_cell.upper() in claim_ids
+            ):
+                start = line_start + line.index(row_text)
+                end = start + len(row_text)
+
+                matches.append(
+                    _SentenceCandidate(
+                        chunk=chunk,
+                        sentence_index=row_index,
+                        start_char=start,
+                        end_char=end,
+                        text=chunk.content[start:end],
+                    )
+                )
+
+            row_index += 1
+
+    if not table_found:
+        return None
+
+    # No matching ID, no ID in the claim, or ambiguous duplicates:
+    # never pass the whole table to NLI as a fallback.
+    if len(matches) != 1:
+        return ()
+
+    return (matches[0],)
+
+
 # Experimental, opt-in fallback. Context must remain a single,
 # exact, contiguous source-chunk slice.
 _MAX_CONTEXT_CHARS = 1000
@@ -253,9 +352,11 @@ class SentenceEvidenceVerificationService:
             candidate
             for chunk in evidence
             for candidate in (
-                _sentence_candidates(
-                    chunk
-                )
+                _markdown_test_row_candidates(chunk, cleaned_claim)
+                if _markdown_test_row_candidates(
+                    chunk, cleaned_claim
+                ) is not None
+                else _sentence_candidates(chunk)
             )
         )
 
@@ -315,6 +416,9 @@ class SentenceEvidenceVerificationService:
             contextual = tuple(
                 candidate
                 for chunk in evidence
+                if _markdown_test_row_candidates(
+                    chunk, cleaned_claim
+                ) is None
                 for candidate in _contextual_candidates(chunk)
             )
 

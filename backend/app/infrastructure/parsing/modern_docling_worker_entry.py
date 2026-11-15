@@ -10,8 +10,8 @@ from pathlib import Path
 
 
 DEFAULT_ARTIFACT_ROOT = (
-    Path.home()
-    / ".govknowledge"
+    Path(__file__).resolve().parents[4]
+    / ".runtime"
     / "artifacts"
     / "docling-p0"
 )
@@ -283,6 +283,7 @@ def _run_parse(
     file_path: Path,
     language: str,
     max_chunk_chars: int,
+    page_range: tuple[int, int] | None = None,
 ) -> tuple[
     dict[str, object],
     dict[str, str],
@@ -419,9 +420,14 @@ def _run_parse(
         time.perf_counter()
     )
 
+    convert_options = {"raises_on_error": True}
+
+    if page_range is not None:
+        convert_options["page_range"] = page_range
+
     conversion = converter.convert(
         source,
-        raises_on_error=True,
+        **convert_options,
     )
 
     document = conversion.document

@@ -55,9 +55,18 @@ SECURITY AND GROUNDING RULES:
 
 {
   "claims": [
-    "exact text copied from authorized evidence"
+    {
+      "evidence_id": "the supplied evidence identifier",
+      "quote": "exact text copied from that evidence"
+    }
   ]
 }
+
+18. evidence_id must exactly match one of the evidence IDs supplied.
+19. quote must be copied exactly from the content associated with
+    that evidence_id.
+20. Do not return offsets, document IDs, page numbers, or any other
+    provenance information.
 
 Do not return Markdown fences or additional commentary.
 """.strip()
@@ -165,9 +174,7 @@ class AnthropicQuestionClaimPlanner(
             ),
             "evidence": [
                 {
-                    "chunk_id": str(
-                        item.chunk_id
-                    ),
+                    "evidence_id": item.evidence_id,
                     "language": (
                         item.language
                     ),
@@ -265,12 +272,41 @@ class AnthropicQuestionClaimPlanner(
                 )
             )
 
-        normalized = []
+        normalized: list[PlannedClaim] = []
 
         for claim in claims:
+            if not isinstance(claim, dict):
+                raise (
+                    AnthropicQuestionClaimPlannerResponseError(
+                        "Anthropic returned an invalid "
+                        "planned claim."
+                    )
+                )
+
+            if set(claim) != {
+                "evidence_id",
+                "quote",
+            }:
+                raise (
+                    AnthropicQuestionClaimPlannerResponseError(
+                        "Anthropic returned an invalid "
+                        "planned claim."
+                    )
+                )
+
+            evidence_id = claim.get(
+                "evidence_id"
+            )
+
+            quote = claim.get(
+                "quote"
+            )
+
             if (
-                not isinstance(claim, str)
-                or not claim.strip()
+                not isinstance(evidence_id, str)
+                or not evidence_id.strip()
+                or not isinstance(quote, str)
+                or not quote.strip()
             ):
                 raise (
                     AnthropicQuestionClaimPlannerResponseError(
@@ -280,12 +316,21 @@ class AnthropicQuestionClaimPlanner(
                 )
 
             normalized.append(
-                claim.strip()
+                PlannedClaim(
+                    evidence_id=evidence_id.strip(),
+                    text=quote.strip(),
+                )
             )
 
-        if len(set(normalized)) != len(
-            normalized
-        ):
+        keys = tuple(
+            (
+                item.evidence_id,
+                item.text,
+            )
+            for item in normalized
+        )
+
+        if len(set(keys)) != len(keys):
             raise (
                 AnthropicQuestionClaimPlannerResponseError(
                     "Anthropic returned duplicate "
@@ -293,12 +338,7 @@ class AnthropicQuestionClaimPlanner(
                 )
             )
 
-        return tuple(
-            PlannedClaim(
-                text=claim
-            )
-            for claim in normalized
-        )
+        return tuple(normalized)
 
     @staticmethod
     def _extract_text(

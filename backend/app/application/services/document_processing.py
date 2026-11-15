@@ -36,6 +36,8 @@ from app.domain.enums.processing import (
 @dataclass(frozen=True)
 class ProcessDocumentRequest:
     processing_job_id: UUID
+    actor_user_id: UUID | None = None
+    correlation_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,8 @@ class DocumentProcessingService:
         event_type: AuditEventType,
         outcome: AuditOutcome,
         target: ProcessingTarget,
+        actor_user_id: UUID | None = None,
+        correlation_id: UUID | None = None,
         error_code: str | None = None,
         metadata: dict[str, object] | None = None,
     ) -> None:
@@ -86,7 +90,7 @@ class DocumentProcessingService:
                 AuditEvent(
                     event_type=event_type,
                     outcome=outcome,
-                    actor_user_id=None,
+                    actor_user_id=actor_user_id,
                     resource_type=(
                         "document_processing_job"
                     ),
@@ -97,7 +101,8 @@ class DocumentProcessingService:
                         target.document_id
                     ),
                     correlation_id=(
-                        target.processing_job_id
+                        correlation_id
+                        or target.processing_job_id
                     ),
                     error_code=error_code,
                     metadata={
@@ -134,6 +139,8 @@ class DocumentProcessingService:
             ),
             outcome=AuditOutcome.SUCCEEDED,
             target=target,
+            actor_user_id=request.actor_user_id,
+            correlation_id=request.correlation_id,
         )
 
         try:
@@ -207,6 +214,9 @@ class DocumentProcessingService:
                     target.processing_job_id
                 ),
                 parsed=parsed,
+                resolve_stored_file=(
+                    self._storage.resolve
+                ),
             )
 
         except Exception:
@@ -230,6 +240,8 @@ class DocumentProcessingService:
                 ),
                 outcome=AuditOutcome.FAILED,
                 target=target,
+                actor_user_id=request.actor_user_id,
+                correlation_id=request.correlation_id,
                 error_code=(
                     "DOCUMENT_PROCESSING_FAILED"
                 ),
@@ -254,6 +266,8 @@ class DocumentProcessingService:
             ),
             outcome=AuditOutcome.SUCCEEDED,
             target=target,
+            actor_user_id=request.actor_user_id,
+            correlation_id=request.correlation_id,
             metadata={
                 "page_count": result.page_count,
                 "chunk_count": result.chunk_count,

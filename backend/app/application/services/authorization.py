@@ -1,4 +1,4 @@
-﻿from uuid import UUID
+from uuid import UUID
 
 from app.application.ports.authorization import (
     AuthorizationRepository,
@@ -22,17 +22,31 @@ class AuthorizationService:
     ) -> None:
         self._repository = repository
 
+    @staticmethod
+    def _is_admin(
+        identity: CurrentIdentity,
+    ) -> bool:
+        return any(
+            str(role).strip().upper() == "ADMIN"
+            for role in identity.roles
+        )
+
     def retrieval_scope(
         self,
         identity: CurrentIdentity,
     ) -> AuthorizationScope:
-        document_ids = (
-            self._repository.document_ids_for_user(
-                user_id=identity.user_id,
-                action=PermissionAction.READ,
-                active_only=True,
+        if self._is_admin(identity):
+            document_ids = (
+                self._repository.active_document_ids()
             )
-        )
+        else:
+            document_ids = (
+                self._repository.document_ids_for_user(
+                    user_id=identity.user_id,
+                    action=PermissionAction.READ,
+                    active_only=True,
+                )
+            )
 
         return AuthorizationScope(
             user_id=identity.user_id,
@@ -45,15 +59,13 @@ class AuthorizationService:
         identity: CurrentIdentity,
         document_id: UUID,
     ) -> None:
-        permitted = (
-            self._repository.has_document_permission(
-                user_id=identity.user_id,
-                document_id=document_id,
-                action=PermissionAction.READ,
-            )
+        scope = self.retrieval_scope(
+            identity
         )
 
-        if not permitted:
+        if not scope.allows(
+            document_id
+        ):
             raise AuthorizationDeniedError(
                 document_id=document_id
             )

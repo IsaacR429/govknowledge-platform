@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from app.infrastructure.parsing.page_ocr_recovery import PageOcrRecovery
 from app.application.ports.parser_execution import (
     ParserExecutionResult,
     ParserExecutor,
@@ -36,6 +37,7 @@ class RoutedParserExecutor(ParserExecutor):
         primary_name: str,
         fallback_name: str,
         fallback_predicate: FallbackPredicate | None = None,
+        ocr_recovery: PageOcrRecovery | None = None,
     ) -> None:
         if not primary_name.strip():
             raise ValueError(
@@ -52,6 +54,7 @@ class RoutedParserExecutor(ParserExecutor):
         self._primary_name = primary_name
         self._fallback_name = fallback_name
         self._fallback_predicate = fallback_predicate
+        self._ocr_recovery = ocr_recovery
 
     @staticmethod
     def _failure_value(
@@ -130,6 +133,38 @@ class RoutedParserExecutor(ParserExecutor):
             file_path,
             language=language,
         )
+
+        # A successful primary parse may need OCR on individual image-only
+        # pages. Recover those pages without replacing the primary document.
+        if (
+            primary_result.parsing_status is ParsingStatus.SUCCESS
+            and self._ocr_recovery is not None
+            and self._fallback_predicate is not None
+            and self._fallback_predicate(file_path, primary_result)
+        ):
+            recovered = self._ocr_recovery.recover(
+                file_path,
+                language=language,
+                primary=primary_result,
+            )
+
+            routed = self._with_routing_lineage(
+                result=recovered,
+                primary_result=primary_result,
+                fallback_result=None,
+                fallback_attempted=False,
+                fallback_reason=None,
+                selected_parser=(
+                    self._primary_name
+                    if recovered.parsing_status is ParsingStatus.SUCCESS
+                    else None
+                ),
+            )
+
+            routed.lineage["parser_routing"]["strategy"] = (
+                "PRIMARY_WITH_PAGE_OCR_RECOVERY"
+            )
+            return routed
 
         fallback_reason: str | None = None
 

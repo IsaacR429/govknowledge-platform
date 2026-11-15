@@ -144,7 +144,7 @@ class GroundedAnswerGenerationService:
 
         validated = (
             self._citation_service.build(
-                evidence_result.assessment
+                evidence_result
             )
         )
 

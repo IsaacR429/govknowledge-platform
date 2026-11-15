@@ -1,4 +1,4 @@
-﻿from uuid import uuid4
+from uuid import uuid4
 
 import pytest
 
@@ -21,10 +21,28 @@ class FakeAuthorizationRepository:
     def __init__(
         self,
         allowed_document_ids: set,
+        *,
+        active_document_ids: set | None = None,
+        direct_permission_document_ids: set | None = None,
     ) -> None:
         self.allowed_document_ids = frozenset(
             allowed_document_ids
         )
+        self.all_active_document_ids = frozenset(
+            active_document_ids
+            if active_document_ids is not None
+            else allowed_document_ids
+        )
+        self.direct_permission_document_ids = frozenset(
+            direct_permission_document_ids
+            if direct_permission_document_ids is not None
+            else allowed_document_ids
+        )
+
+    def active_document_ids(
+        self,
+    ):
+        return self.all_active_document_ids
 
     def document_ids_for_user(
         self,
@@ -47,7 +65,7 @@ class FakeAuthorizationRepository:
         return (
             action == PermissionAction.READ
             and document_id
-            in self.allowed_document_ids
+            in self.direct_permission_document_ids
         )
 
 
@@ -117,20 +135,114 @@ def test_unauthorized_document_is_denied():
         )
 
 
-def test_admin_does_not_bypass_document_acl():
-    unauthorized_document = uuid4()
+def test_admin_retrieval_scope_contains_all_active_documents():
+    first_document = uuid4()
+    second_document = uuid4()
 
-    repository = FakeAuthorizationRepository(set())
+    repository = FakeAuthorizationRepository(
+        set(),
+        active_document_ids={
+            first_document,
+            second_document,
+        },
+    )
 
-    service = AuthorizationService(repository)
+    service = AuthorizationService(
+        repository
+    )
 
     admin = make_identity(
         roles=("ADMIN",)
     )
 
-    scope = service.retrieval_scope(admin)
+    scope = service.retrieval_scope(
+        admin
+    )
+
+    assert scope.allows(
+        first_document
+    )
+    assert scope.allows(
+        second_document
+    )
+    assert scope.document_ids == frozenset(
+        {
+            first_document,
+            second_document,
+        }
+    )
+
+
+def test_admin_can_read_active_document_without_acl():
+    active_document = uuid4()
+
+    repository = FakeAuthorizationRepository(
+        set(),
+        active_document_ids={
+            active_document
+        },
+        direct_permission_document_ids=set(),
+    )
+
+    service = AuthorizationService(
+        repository
+    )
+
+    admin = make_identity(
+        roles=("ADMIN",)
+    )
+
+    service.require_document_read(
+        admin,
+        active_document,
+    )
+
+
+def test_employee_does_not_inherit_admin_document_scope():
+    active_document = uuid4()
+
+    repository = FakeAuthorizationRepository(
+        set(),
+        active_document_ids={
+            active_document
+        },
+    )
+
+    service = AuthorizationService(
+        repository
+    )
+
+    employee = make_identity(
+        roles=("EMPLOYEE",)
+    )
+
+    scope = service.retrieval_scope(
+        employee
+    )
 
     assert not scope.allows(
-        unauthorized_document
+        active_document
     )
     assert scope.document_ids == frozenset()
+
+
+def test_archived_document_with_stale_read_permission_is_denied():
+    archived_document = uuid4()
+    repository = FakeAuthorizationRepository(
+        set(),
+        direct_permission_document_ids={
+            archived_document
+        },
+    )
+    service = AuthorizationService(
+        repository
+    )
+    identity = make_identity()
+
+    with pytest.raises(
+        AuthorizationDeniedError
+    ):
+        service.require_document_read(
+            identity,
+            archived_document,
+        )

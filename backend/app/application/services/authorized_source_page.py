@@ -45,7 +45,7 @@ class AuthorizedSourcePageService:
         )
         self._audit = audit
 
-    def get(
+    def authorize(
         self,
         *,
         identity: CurrentIdentity,
@@ -113,30 +113,45 @@ class AuthorizedSourcePageService:
 
             raise
 
-        # Successful disclosure requires a
-        # successfully persisted access event.
-        # AuditPersistenceError intentionally
-        # propagates here: no audit, no page.
+        return page
+
+    def record_view(
+        self,
+        *,
+        identity: CurrentIdentity,
+        page: SourcePage,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        # No audit, no disclosure: allow AuditPersistenceError
+        # to propagate if this record cannot be committed.
         self._audit.record(
             AuditEvent(
-                event_type=(
-                    AuditEventType
-                    .SOURCE_PAGE_VIEWED
-                ),
-                outcome=(
-                    AuditOutcome.SUCCEEDED
-                ),
-                actor_user_id=(
-                    identity.user_id
-                ),
+                event_type=AuditEventType.SOURCE_PAGE_VIEWED,
+                outcome=AuditOutcome.SUCCEEDED,
+                actor_user_id=identity.user_id,
                 resource_type="source_page",
                 resource_id=page.page_id,
                 document_id=page.document_id,
                 correlation_id=correlation_id,
-                metadata={
-                    "permission": "READ",
-                },
+                metadata={"permission": "READ"},
             )
         )
 
+    def get(
+        self,
+        *,
+        identity: CurrentIdentity,
+        page_id: UUID,
+        correlation_id: UUID | None = None,
+    ) -> SourcePage:
+        page = self.authorize(
+            identity=identity,
+            page_id=page_id,
+            correlation_id=correlation_id,
+        )
+        self.record_view(
+            identity=identity,
+            page=page,
+            correlation_id=correlation_id,
+        )
         return page

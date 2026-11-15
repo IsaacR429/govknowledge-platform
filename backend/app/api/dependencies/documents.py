@@ -1,9 +1,15 @@
-﻿from pathlib import Path
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.api.dependencies.audit import (
+    get_audit_service,
+)
+from app.application.services.audit import (
+    AuditService,
+)
 from app.application.services.document_ingestion import (
     DocumentIngestionService,
 )
@@ -22,6 +28,10 @@ def get_document_ingestion_service(
         Session,
         Depends(get_db),
     ],
+    audit: Annotated[
+        AuditService,
+        Depends(get_audit_service),
+    ],
 ) -> DocumentIngestionService:
     settings = get_settings()
 
@@ -36,4 +46,5 @@ def get_document_ingestion_service(
                 settings.document_storage_root
             )
         ),
+        audit=audit,
     )

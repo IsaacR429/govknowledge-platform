@@ -1,4 +1,7 @@
+from dataclasses import replace
 from io import BytesIO
+from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -10,6 +13,16 @@ from app.application.ports.document_parser import (
     ParsedDocument,
     ParsedPage,
 )
+from app.application.services.citation_mapping import (
+    EvidenceSpanCitationMapper,
+)
+from app.application.services.citation_validation import (
+    CitationValidator,
+    InvalidCitationError,
+)
+from app.application.services.document_indexing import (
+    DocumentIndexingService,
+)
 from app.application.services.document_ingestion import (
     CreateDocumentRequest,
     DocumentIngestionService,
@@ -18,6 +31,7 @@ from app.application.services.document_processing import (
     DocumentProcessingService,
     ProcessDocumentRequest,
 )
+from app.domain.enums.permission import PermissionAction
 from app.domain.enums.processing import (
     ParserFailureClass,
     ParsingStatus,
@@ -29,8 +43,15 @@ from app.infrastructure.database.models.documents import (
     DocumentPage,
     DocumentVersion,
 )
+from app.infrastructure.database.models.embeddings import (
+    ChunkEmbedding,
+    EMBEDDING_DIMENSION,
+)
 from app.infrastructure.database.models.processing import (
     DocumentProcessingJob,
+)
+from app.infrastructure.database.repositories.chunk_embeddings import (
+    PostgresChunkEmbeddingRepository,
 )
 from app.infrastructure.database.repositories.document_ingestion import (
     PostgresDocumentIngestionRepository,
@@ -40,6 +61,9 @@ from app.infrastructure.database.repositories.document_processing import (
 )
 from app.infrastructure.database.session import (
     SessionLocal,
+)
+from app.infrastructure.retrieval.postgres_vector_retrieval import (
+    PostgresVectorRetrievalAdapter,
 )
 from app.infrastructure.storage.local_file_storage import (
     LocalFileStorage,
@@ -74,6 +98,31 @@ class CountingParser:
     ):
         self.calls += 1
         return self.parsed
+
+
+class DeterministicTableTestEmbedding:
+    model_name = "qa-reviewed-table-index-test"
+    model_revision = "fixture-1"
+    dimension = EMBEDDING_DIMENSION
+
+    def __init__(self):
+        self.calls = []
+
+    def embed_passages(self, texts):
+        self.calls.append(tuple(texts))
+
+        # Unit-length vector with the database's expected dimension.
+        values = (1.0,) + (0.0,) * (self.dimension - 1)
+
+        return tuple(
+            SimpleNamespace(
+                model_name=self.model_name,
+                model_revision=self.model_revision,
+                dimension=self.dimension,
+                values=values,
+            )
+            for _ in texts
+        )
 
 
 def valid_parsed_document():
@@ -145,7 +194,19 @@ def invalid_parsed_document():
 def ingest_document(
     db,
     storage,
+    source=None,
+    actor_user_id=None,
+    correlation_id=None,
 ):
+    from app.application.services.audit import AuditService
+    from app.infrastructure.database.repositories.audit import (
+        PostgresAuditRepository,
+    )
+
+    audit_service = AuditService(
+        repository=PostgresAuditRepository(db)
+    )
+
     service = DocumentIngestionService(
         repository=(
             PostgresDocumentIngestionRepository(
@@ -153,6 +214,7 @@ def ingest_document(
             )
         ),
         storage=storage,
+        audit=audit_service,
     )
 
     return service.create_initial_upload(
@@ -178,9 +240,13 @@ def ingest_document(
             ),
             original_filename="test.pdf",
         ),
-        source=BytesIO(
-            b"%PDF-1.4 fake test content"
+        source=(
+            source
+            if source is not None
+            else BytesIO(b"%PDF-1.4 fake test content")
         ),
+        actor_user_id=actor_user_id or uuid4(),
+        correlation_id=correlation_id or uuid4(),
     )
 
 
@@ -191,6 +257,16 @@ def cleanup_document(
     version_id,
 ):
     db.rollback()
+
+    db.execute(
+        delete(ChunkEmbedding).where(
+            ChunkEmbedding.chunk_id.in_(
+                select(DocumentChunk.id).where(
+                    DocumentChunk.document_version_id == version_id
+                )
+            )
+        )
+    )
 
     db.execute(
         delete(
@@ -964,4 +1040,110 @@ def test_parser_outcome_persists_across_fresh_session(
                 version_id=created.version_id,
             )
 
+        db.close()
+
+
+def test_unapproved_table_evidence_persists_no_pages_or_chunks(
+    tmp_path,
+):
+    from sqlalchemy import text
+
+    db = SessionLocal()
+    storage = LocalFileStorage(tmp_path / "documents")
+    created = None
+
+    try:
+        # Fail before writing anything if this test is pointed
+        # at the live database instead of the isolated QA database.
+        database_name = db.scalar(
+            text("SELECT current_database()")
+        )
+        assert database_name == "govknowledge_qa", (
+            "This test must run against the isolated QA database."
+        )
+
+        created = ingest_document(db, storage)
+
+        original = valid_parsed_document()
+        candidate_chunk = ParsedChunk(
+            page_number=1,
+            chunk_index=0,
+            content=(
+                "Organization: DRAC. "
+                "Marked activities: Creation, Diffusion, Training."
+            ),
+            section_title="The main players",
+            language="en",
+            metadata={
+                "evidence_type": "vector_marker_table",
+                "validation_status": "candidate",
+                "table_id": "page-19-table-1",
+            },
+        )
+
+        parsed = ParsedDocument(
+            pages=original.pages,
+            chunks=(candidate_chunk, *original.chunks[1:]),
+        )
+
+        service = DocumentProcessingService(
+            repository=PostgresDocumentProcessingRepository(db),
+            storage=storage,
+            parser=CountingParser(parsed),
+            audit=RecordingAuditService(),
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=r"(?i)table evidence",
+        ):
+            service.process(
+                ProcessDocumentRequest(
+                    processing_job_id=created.processing_job_id,
+                )
+            )
+
+        # Verify persisted state through a fresh database session,
+        # not just the session that encountered the error.
+        with SessionLocal() as verification_db:
+            version = verification_db.get(
+                DocumentVersion,
+                created.version_id,
+            )
+            job = verification_db.get(
+                DocumentProcessingJob,
+                created.processing_job_id,
+            )
+
+            assert version is not None
+            assert job is not None
+            assert (
+                version.processing_status
+                == ProcessingStatus.FAILED.value
+            )
+            assert job.status == ProcessingStatus.FAILED.value
+
+            page_count = verification_db.scalar(
+                select(func.count(DocumentPage.id)).where(
+                    DocumentPage.document_version_id
+                    == created.version_id
+                )
+            )
+            chunk_count = verification_db.scalar(
+                select(func.count(DocumentChunk.id)).where(
+                    DocumentChunk.document_version_id
+                    == created.version_id
+                )
+            )
+
+            assert page_count == 0
+            assert chunk_count == 0
+
+    finally:
+        if created is not None:
+            cleanup_document(
+                db,
+                document_id=created.document_id,
+                version_id=created.version_id,
+            )
         db.close()

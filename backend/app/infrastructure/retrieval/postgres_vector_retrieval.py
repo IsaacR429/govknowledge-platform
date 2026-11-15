@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.application.ports.authorization import (
@@ -120,6 +120,15 @@ class PostgresVectorRetrievalAdapter(
                 Document.status == "ACTIVE",
                 DocumentVersion.processing_status
                 == ProcessingStatus.SUCCEEDED.value,
+                # P0: experimental graphical-matrix rows are not
+                # eligible as answer evidence, even if indexed.
+                # Missing evidence_type remains eligible.
+                func.coalesce(
+                    DocumentChunk.metadata_json.op("->>")(
+                        "evidence_type"
+                    ),
+                    "",
+                ) != "vector_marker_table",
                 ChunkEmbedding.model_name
                 == model_name,
                 ChunkEmbedding.model_revision

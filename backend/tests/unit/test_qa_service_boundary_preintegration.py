@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from types import SimpleNamespace
 from uuid import uuid4
@@ -40,19 +40,31 @@ class SpySearch:
 
 
 class SpyPlanner:
-    def __init__(self, claim_text):
+    def __init__(self, claim_text, evidence_id="evidence-1"):
         self.claim_text = claim_text
+        self.evidence_id = evidence_id
         self.calls = []
 
     def plan(self, request):
         self.calls.append(request)
-        return (PlannedClaim(text=self.claim_text),)
+        return (
+            PlannedClaim(
+                evidence_id=self.evidence_id,
+                text=self.claim_text,
+            ),
+        )
 
 
 class SpyEvidence:
     def __init__(self):
         self.calls = []
-        self.result = object()
+        self.result = SimpleNamespace(
+            assessment=SimpleNamespace(
+                is_sufficient=False,
+                selected_evidence=(),
+            ),
+            claim_results=(),
+        )
 
     def evaluate(self, *, identity, claims, correlation_id):
         self.calls.append((identity, claims, correlation_id))
@@ -62,11 +74,20 @@ class SpyEvidence:
 class SpyAnswer:
     def __init__(self):
         self.calls = []
-        self.result = object()
+        self.result = SimpleNamespace(
+            correlation_id=uuid4(),
+            status="SUPPORTED",
+            citations=SimpleNamespace(citations=()),
+        )
 
     def generate(self, *, question, evidence_result, language):
         self.calls.append((question, evidence_result, language))
         return self.result
+
+
+class SpyAuthorization:
+    def require_document_read(self, identity, document_id):
+        pass
 
 
 def fixture(*, results=(), claim_text=SOURCE_FACT, error=None):
@@ -82,6 +103,7 @@ def fixture(*, results=(), claim_text=SOURCE_FACT, error=None):
         planner=planner,
         evidence=evidence,
         answer=answer,
+        authorization=SpyAuthorization(),
         audit=AuditService(audit_repository),
         discovery_top_k=5,
     )
@@ -100,6 +122,10 @@ def fixture(*, results=(), claim_text=SOURCE_FACT, error=None):
 def authorized_hit(content=SOURCE_FACT):
     return SimpleNamespace(
         chunk_id=uuid4(),
+        document_id=uuid4(),
+        document_version_id=uuid4(),
+        page_id=uuid4(),
+        page_number=1,
         language="en",
         content=content,
     )
@@ -131,7 +157,7 @@ def test_invented_planner_claim_is_rejected_before_evidence():
 
     with pytest.raises(
         InvalidPlannedClaimError,
-        match="not present in authorized source evidence",
+        match="Planner quote is not present in the selected authorized evidence.",
     ):
         case.service.answer(
             identity=case.identity,

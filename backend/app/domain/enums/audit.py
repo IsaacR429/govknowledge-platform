@@ -19,6 +19,9 @@ class AuditEventType(str, Enum):
     DOCUMENT_READ_GRANTED = (
         "DOCUMENT_READ_GRANTED"
     )
+    DOCUMENT_READ_REVOKED = (
+        "DOCUMENT_READ_REVOKED"
+    )
     DOCUMENT_READ_DENIED = (
         "DOCUMENT_READ_DENIED"
     )
@@ -43,6 +46,13 @@ class AuditEventType(str, Enum):
         "EVIDENCE_FAILED"
     )
 
+    ANSWER_GENERATED = (
+        "ANSWER_GENERATED"
+    )
+    ANSWER_REFUSED = (
+        "ANSWER_REFUSED"
+    )
+
     CITATION_VALIDATED = (
         "CITATION_VALIDATED"
     )
@@ -52,6 +62,12 @@ class AuditEventType(str, Enum):
 
     DOCUMENT_INGESTED = (
         "DOCUMENT_INGESTED"
+    )
+    DOCUMENT_METADATA_UPDATED = (
+        "DOCUMENT_METADATA_UPDATED"
+    )
+    DOCUMENT_ARCHIVED = (
+        "DOCUMENT_ARCHIVED"
     )
     DOCUMENT_PROCESSING_STARTED = (
         "DOCUMENT_PROCESSING_STARTED"

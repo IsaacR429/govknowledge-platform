@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
@@ -60,6 +62,7 @@ class DocumentProcessingRepository(Protocol):
         version_id: UUID,
         processing_job_id: UUID,
         parsed: ParsedDocument,
+        resolve_stored_file: Callable[[str], Path] | None = None,
     ) -> None:
         ...
 

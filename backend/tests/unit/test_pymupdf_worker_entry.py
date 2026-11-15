@@ -43,6 +43,11 @@ class FakePage:
             )
         ]
 
+    def find_tables(self):
+        return types.SimpleNamespace(
+            tables=[]
+        )
+
 
 class FakePdf:
     def __init__(
@@ -223,8 +228,19 @@ def test_run_parse_produces_canonical_contract(
         "pymupdf_version": "1.28.2",
     }
 
-    assert worker_setup_ms >= 0
-    assert parser_execution_ms >= 0
+    assert (
+        parsed[
+            "table_evidence_schema_version"
+        ]
+        == 1
+    )
+
+    assert (
+        parsed[
+            "table_evidence"
+        ]
+        == []
+    )
 
     pages = parsed["pages"]
     chunks = parsed["chunks"]

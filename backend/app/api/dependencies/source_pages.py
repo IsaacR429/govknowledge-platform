@@ -17,8 +17,8 @@ from app.application.services.authorization import (
 from app.application.services.authorized_source_page import (
     AuthorizedSourcePageService,
 )
-from app.infrastructure.database.repositories.authorization import (
-    PostgresAuthorizationRepository,
+from app.api.dependencies.authorization import (
+    get_authorization_service,
 )
 from app.infrastructure.database.repositories.source_pages import (
     PostgresSourcePageRepository,
@@ -28,17 +28,6 @@ from app.infrastructure.database.session import (
 )
 
 
-def get_authorization_service(
-    db: Annotated[
-        Session,
-        Depends(get_db),
-    ],
-) -> AuthorizationService:
-    return AuthorizationService(
-        PostgresAuthorizationRepository(
-            db
-        )
-    )
 
 
 def get_authorized_source_page_service(
@@ -65,4 +54,18 @@ def get_authorized_source_page_service(
         ),
         authorization=authorization,
         audit=audit,
+    )
+
+
+from pathlib import Path
+
+from app.core.config import get_settings
+from app.infrastructure.storage.local_file_storage import (
+    LocalFileStorage,
+)
+
+
+def get_source_page_storage() -> LocalFileStorage:
+    return LocalFileStorage(
+        Path(get_settings().document_storage_root)
     )

@@ -24,9 +24,16 @@ from app.application.services.authorized_search import (
     AuthorizedSearchResult,
     AuthorizedSearchService,
 )
+from app.application.services.grounded_answer_generation import (
+    InvalidGeneratedCitationError,
+)
 from app.application.services.question_answer import (
     InvalidPlannedClaimError,
     QuestionAnswerService,
+)
+from app.domain.enums.audit import (
+    AuditEventType,
+    AuditOutcome,
 )
 
 
@@ -93,10 +100,23 @@ class FakePlanner:
         self,
         claims,
     ):
-        self.claims = tuple(
-            PlannedClaim(text=item)
-            for item in claims
-        )
+        processed = []
+        for item in claims:
+            if isinstance(item, tuple):
+                processed.append(
+                    PlannedClaim(
+                        evidence_id=item[0],
+                        text=item[1],
+                    )
+                )
+            else:
+                processed.append(
+                    PlannedClaim(
+                        evidence_id="evidence-1",
+                        text=item,
+                    )
+                )
+        self.claims = tuple(processed)
         self.calls = []
 
     def plan(
@@ -108,8 +128,25 @@ class FakePlanner:
         return self.claims
 
 
+class FakeAuthorizationService:
+    def __init__(self, denied_document_ids=()):
+        self.denied_document_ids = set(denied_document_ids)
+        self.read_calls = []
+
+    def require_document_read(self, identity, document_id):
+        self.read_calls.append((identity, document_id))
+        if document_id in self.denied_document_ids:
+            from app.domain.exceptions.authorization import (
+                AuthorizationDeniedError,
+            )
+            raise AuthorizationDeniedError(
+                "READ permission denied at reauthorization."
+            )
+
+
 class FakeEvidenceService:
-    def __init__(self):
+    def __init__(self, is_sufficient=True):
+        self.is_sufficient = is_sufficient
         self.calls = []
 
     def evaluate(
@@ -129,14 +166,32 @@ class FakeEvidenceService:
             )
         )
 
+        claim_results = tuple(
+            SimpleNamespace(claim=c)
+            for c in claims
+        )
+
+        selected_evidence = tuple(
+            SimpleNamespace(claim_id=c.claim_id)
+            for c in claims
+        ) if (self.is_sufficient and claims) else ()
+
+        is_sufficient = self.is_sufficient if claims else False
+
         return SimpleNamespace(
             correlation_id=correlation_id,
             claims=claims,
+            claim_results=claim_results,
+            assessment=SimpleNamespace(
+                is_sufficient=is_sufficient,
+                selected_evidence=selected_evidence,
+            ),
         )
 
 
 class FakeAnswerService:
-    def __init__(self):
+    def __init__(self, status="SUPPORTED"):
+        self.status = status
         self.calls = []
 
     def generate(
@@ -155,7 +210,9 @@ class FakeAnswerService:
         )
 
         return SimpleNamespace(
-            status="TEST",
+            correlation_id=getattr(evidence_result, "correlation_id", uuid4()),
+            status=self.status,
+            citations=SimpleNamespace(citations=()),
             question=question,
             evidence_result=evidence_result,
             language=language,
@@ -353,6 +410,7 @@ def identity():
     return SimpleNamespace(
         user_id=uuid4(),
         language_preference="fr",
+        roles=("EMPLOYEE",),
     )
 
 
@@ -362,6 +420,7 @@ def service(
     planner,
     evidence=None,
     answer=None,
+    authorization=None,
     audit=None,
 ):
     evidence = (
@@ -376,6 +435,12 @@ def service(
         else FakeAnswerService()
     )
 
+    authorization = (
+        authorization
+        if authorization is not None
+        else FakeAuthorizationService()
+    )
+
     audit = (
         audit
         if audit is not None
@@ -388,6 +453,7 @@ def service(
             planner=planner,
             evidence=evidence,
             answer=answer,
+            authorization=authorization,
             audit=audit,
         ),
         evidence,
@@ -422,7 +488,7 @@ def test_exact_source_claim_becomes_atomic_claim():
         language="fr",
     )
 
-    assert result.status == "TEST"
+    assert result.status == "SUPPORTED"
 
     assert len(
         evidence.calls
@@ -469,8 +535,8 @@ def test_claim_not_present_in_authorized_evidence_is_rejected():
     with pytest.raises(
         InvalidPlannedClaimError,
         match=(
-            "not present in authorized "
-            "source evidence"
+            "Planner quote is not present in "
+            "the selected authorized evidence."
         ),
     ):
         qa.answer(
@@ -481,6 +547,40 @@ def test_claim_not_present_in_authorized_evidence_is_rejected():
 
     assert evidence.calls == []
     assert answer.calls == []
+
+
+def test_unknown_evidence_id_is_rejected():
+    search = FakeSearch((chunk(),))
+    planner = FakePlanner((("evidence-unknown", SOURCE_SENTENCE),))
+    qa, evidence, answer = service(search=search, planner=planner)
+
+    with pytest.raises(
+        InvalidPlannedClaimError,
+        match="Planner referenced unknown evidence.",
+    ):
+        qa.answer(
+            identity=identity(),
+            question="Question",
+            language="fr",
+        )
+
+
+def test_ambiguous_planned_claim_is_rejected():
+    ambiguous_text = "repeat"
+    content = f"First {ambiguous_text} and second {ambiguous_text}."
+    search = FakeSearch((chunk(text=content),))
+    planner = FakePlanner((("evidence-1", ambiguous_text),))
+    qa, evidence, answer = service(search=search, planner=planner)
+
+    with pytest.raises(
+        InvalidPlannedClaimError,
+        match="Planner quote is ambiguous within the selected authorized evidence.",
+    ):
+        qa.answer(
+            identity=identity(),
+            question="Question",
+            language="fr",
+        )
 
 
 def test_only_top_source_language_is_sent_to_planner():
@@ -708,6 +808,7 @@ def test_initial_discovery_authorization_failure_stops_qa():
         planner=planner,
         evidence=evidence,
         answer=answer,
+        authorization=FakeAuthorizationService(),
         audit=FakeAuditService(),
         discovery_top_k=10,
     )
@@ -784,6 +885,7 @@ def test_initial_discovery_authorization_failure_is_audited_as_failed():
         planner=planner,
         evidence=evidence,
         answer=answer,
+        authorization=FakeAuthorizationService(),
         audit=audit,
         discovery_top_k=10,
     )
@@ -926,6 +1028,7 @@ def test_atomic_reauthorization_failure_is_terminal_and_not_double_audited():
         planner=planner,
         evidence=evidence,
         answer=answer,
+        authorization=FakeAuthorizationService(),
         audit=audit,
         discovery_top_k=10,
     )
@@ -1011,3 +1114,157 @@ def test_atomic_reauthorization_failure_is_terminal_and_not_double_audited():
         != AuditEventType.EVIDENCE_INSUFFICIENT
         for event in audit.calls
     )
+
+
+def test_invalid_generated_citation_is_audited_and_not_answered():
+    class InvalidCitationAnswerService:
+        def __init__(self):
+            self.calls = []
+
+        def generate(
+            self,
+            *,
+            question,
+            evidence_result,
+            language="fr",
+        ):
+            self.calls.append(
+                (
+                    question,
+                    evidence_result,
+                    language,
+                )
+            )
+
+            raise InvalidGeneratedCitationError(
+                "SIMULATED_INVALID_GENERATED_CITATION"
+            )
+
+    search = FakeSearch(
+        (
+            chunk(),
+        )
+    )
+
+    planner = FakePlanner(
+        (
+            SOURCE_SENTENCE,
+        )
+    )
+
+    evidence = FakeEvidenceService()
+    answer = InvalidCitationAnswerService()
+    audit = FakeAuditService()
+
+    qa = QuestionAnswerService(
+        search=search,
+        planner=planner,
+        evidence=evidence,
+        answer=answer,
+        authorization=FakeAuthorizationService(),
+        audit=audit,
+        discovery_top_k=10,
+    )
+
+    test_identity = identity()
+
+    with pytest.raises(
+        InvalidGeneratedCitationError,
+        match=(
+            "SIMULATED_INVALID_GENERATED_CITATION"
+        ),
+    ):
+        qa.answer(
+            identity=test_identity,
+            question=(
+                "Quel est le délai pour "
+                "un bagage endommagé ?"
+            ),
+            language="fr",
+        )
+
+    assert len(answer.calls) == 1
+
+    # The rejected citation must produce exactly
+    # one terminal citation audit from this service.
+    assert len(audit.calls) == 1
+
+    rejected = audit.calls[0]
+
+    assert (
+        rejected.event_type
+        == AuditEventType.CITATION_REJECTED
+    )
+    assert (
+        rejected.outcome
+        == AuditOutcome.FAILED
+    )
+    assert (
+        rejected.actor_user_id
+        == test_identity.user_id
+    )
+    assert (
+        rejected.resource_type
+        == "qa_citation"
+    )
+    assert (
+        rejected.error_code
+        == "INVALID_GENERATED_CITATION"
+    )
+    assert rejected.metadata == {
+        "stage": "generated_answer_validation",
+    }
+
+    # The same correlation identifier used by
+    # evidence processing must be retained.
+    evidence_result = answer.calls[0][1]
+
+    assert (
+        rejected.correlation_id
+        == evidence_result.correlation_id
+    )
+
+    # A rejected generated citation must never
+    # produce a successful answer audit.
+    assert not any(
+        event.event_type
+        == AuditEventType.ANSWER_GENERATED
+        for event in audit.calls
+    )
+
+
+def test_final_reauthorization_failure_blocks_llm_and_citation():
+    from app.domain.exceptions.authorization import AuthorizationDeniedError
+
+    doc_a_id = uuid4()
+    discovery_chunk = chunk(text=SOURCE_SENTENCE)
+    object.__setattr__(discovery_chunk, "document_id", doc_a_id)
+
+    search = FakeSearch((discovery_chunk,))
+    planner = FakePlanner((SOURCE_SENTENCE,))
+    evidence = FakeEvidenceService(is_sufficient=True)
+    answer = FakeAnswerService()
+    authorization = FakeAuthorizationService(denied_document_ids=(doc_a_id,))
+
+    qa = QuestionAnswerService(
+        search=search,
+        planner=planner,
+        evidence=evidence,
+        answer=answer,
+        authorization=authorization,
+        audit=FakeAuditService(),
+    )
+
+    with pytest.raises(AuthorizationDeniedError):
+        qa.answer(
+            identity=identity(),
+            question="What is the rule?",
+            language="en",
+        )
+
+    # Reauthorization check was invoked with document A
+    assert len(authorization.read_calls) == 1
+    assert authorization.read_calls[0][1] == doc_a_id
+
+    # Crucial security invariant: final answer provider (LLM) was untouched!
+    assert answer.calls == []

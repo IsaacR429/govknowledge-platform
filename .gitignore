@@ -39,3 +39,6 @@ backend/performance_qualification_output.txt
 
 # Local one-off UNICEF vertical-slice manifest
 /documents/qualification/parser-resilience/UNICEF-PYMUPDF-VERTICAL-SLICE-MANIFEST.json
+
+# Repo-local environments and model artifacts
+/.runtime/

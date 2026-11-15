@@ -609,6 +609,9 @@ def test_authorization_infrastructure_failure_is_sanitized_over_http():
         planner=planner,
         evidence=evidence,
         answer=answer,
+        authorization=AuthorizationService(
+            FailingAuthorizationRepository()
+        ),
         audit=audit,
         discovery_top_k=10,
     )

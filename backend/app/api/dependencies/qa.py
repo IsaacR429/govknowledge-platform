@@ -25,6 +25,9 @@ from app.application.ports.llm_provider import (
 from app.application.ports.question_claim_planner import (
     QuestionClaimPlanner,
 )
+from app.application.ports.table_question_planner import (
+    TableQuestionPlanner,
+)
 from app.application.services.atomic_evidence_orchestration import (
     AtomicEvidenceOrchestrationService,
 )
@@ -40,14 +43,35 @@ from app.application.services.authorization import (
 from app.application.services.authorized_search import (
     AuthorizedSearchService,
 )
+from app.application.services.authorized_table_evidence import (
+    AuthorizedTableEvidenceService,
+)
 from app.application.services.citation_mapping import (
-    EvidenceSpanCitationMapper,
+    ClaimOriginCitationMapper,
 )
 from app.application.services.citation_validation import (
     CitationValidator,
 )
 from app.application.services.grounded_answer_generation import (
     GroundedAnswerGenerationService,
+)
+from app.application.services.table_citation_validation import (
+    TableClaimCitationValidator,
+)
+from app.application.services.table_claim_provenance import (
+    DirectTableClaimBuilder,
+)
+from app.application.services.table_grounded_answer_generation import (
+    TableGroundedAnswerGenerationService,
+)
+from app.application.services.table_question_answer import (
+    TableQuestionAnswerService,
+)
+from app.application.services.table_question_interpretation import (
+    ValidatedTableQuestionInterpreter,
+)
+from app.application.services.table_question_orchestration import (
+    TableQuestionOrchestrationService,
 )
 from app.application.services.question_answer import (
     QuestionAnswerService,
@@ -68,11 +92,17 @@ from app.infrastructure.database.repositories.citation_presentation import (
 from app.infrastructure.database.repositories.citation_sources import (
     PostgresCitationSourceRepository,
 )
+from app.infrastructure.database.repositories.table_evidence import (
+    PostgresTableEvidenceRepository,
+)
 from app.infrastructure.database.session import (
     get_db,
 )
 from app.infrastructure.llm.anthropic_question_claim_planner import (
     AnthropicQuestionClaimPlanner,
+)
+from app.infrastructure.llm.anthropic_table_question_planner import (
+    AnthropicTableQuestionPlanner,
 )
 from app.infrastructure.retrieval.postgres_vector_retrieval import (
     PostgresVectorRetrievalAdapter,
@@ -189,6 +219,89 @@ def get_question_claim_planner(
     )
 
 
+def get_authorized_search_service(
+    db: Annotated[
+        Session,
+        Depends(get_db),
+    ],
+    authorization: Annotated[
+        AuthorizationService,
+        Depends(get_authorization_service),
+    ],
+) -> AuthorizedSearchService:
+    return AuthorizedSearchService(
+        authorization=authorization,
+        embedding_provider=get_qa_embedding_provider(),
+        retrieval=PostgresVectorRetrievalAdapter(
+            db
+        ),
+    )
+
+
+
+def get_table_question_planner(
+    settings: Annotated[
+        Settings,
+        Depends(get_settings),
+    ],
+) -> TableQuestionPlanner:
+
+    if settings.anthropic_api_key is None:
+        raise QuestionAnswerConfigurationError(
+            "Anthropic API key is not configured."
+        )
+
+    if (
+        settings.anthropic_model is None
+        or not settings.anthropic_model.strip()
+    ):
+        raise QuestionAnswerConfigurationError(
+            "Anthropic model is not configured."
+        )
+
+    if settings.anthropic_max_tokens < 1:
+        raise QuestionAnswerConfigurationError(
+            "Anthropic max_tokens must be positive."
+        )
+
+    client_kwargs = {
+        "api_key": (
+            settings
+            .anthropic_api_key
+            .get_secret_value()
+        ),
+    }
+
+    if (
+        settings.anthropic_workspace_id
+        and settings.anthropic_workspace_id.strip()
+    ):
+        client_kwargs[
+            "default_headers"
+        ] = {
+            "anthropic-workspace-id": (
+                settings
+                .anthropic_workspace_id
+                .strip()
+            )
+        }
+
+    client = Anthropic(
+        **client_kwargs
+    )
+
+    return AnthropicTableQuestionPlanner(
+        client=client,
+        model=(
+            settings
+            .anthropic_model
+            .strip()
+        ),
+        max_tokens=(
+            settings.anthropic_max_tokens
+        ),
+    )
+
 def get_question_answer_service(
     db: Annotated[
         Session,
@@ -210,29 +323,24 @@ def get_question_answer_service(
             get_question_claim_planner
         ),
     ],
+    table_planner: Annotated[
+        TableQuestionPlanner,
+        Depends(
+            get_table_question_planner
+        ),
+    ],
     llm_provider: Annotated[
         LLMProvider,
         Depends(get_llm_provider),
     ],
 ) -> QuestionAnswerService:
-    embedding_provider = (
-        get_qa_embedding_provider()
-    )
-
     entailment_verifier = (
         get_qa_entailment_verifier()
     )
 
-    search = AuthorizedSearchService(
+    search = get_authorized_search_service(
+        db=db,
         authorization=authorization,
-        embedding_provider=(
-            embedding_provider
-        ),
-        retrieval=(
-            PostgresVectorRetrievalAdapter(
-                db
-            )
-        ),
     )
 
     verification = (
@@ -254,7 +362,7 @@ def get_question_answer_service(
     citation_service = (
         ValidatedCitationService(
             mapper=(
-                EvidenceSpanCitationMapper()
+                ClaimOriginCitationMapper()
             ),
             validator=(
                 CitationValidator(
@@ -277,13 +385,79 @@ def get_question_answer_service(
         )
     )
 
+    table_repository = (
+        PostgresTableEvidenceRepository(
+            db
+        )
+    )
+
+    table_evidence = (
+        AuthorizedTableEvidenceService(
+            authorization=authorization,
+            repository=(
+                table_repository
+            ),
+        )
+    )
+
+    table_citation_validator = (
+        TableClaimCitationValidator(
+            authorization=authorization,
+            repository=(
+                table_repository
+            ),
+        )
+    )
+
+    table_answer_generation = (
+        TableGroundedAnswerGenerationService(
+            citation_validator=(
+                table_citation_validator
+            ),
+        )
+    )
+
+    table_orchestration = (
+        TableQuestionOrchestrationService(
+            evidence=table_evidence,
+            claim_builder=(
+                DirectTableClaimBuilder()
+            ),
+            answer=(
+                table_answer_generation
+            ),
+        )
+    )
+
+    table_interpreter = (
+        ValidatedTableQuestionInterpreter(
+            planner=table_planner
+        )
+    )
+
+    table_question_answer = (
+        TableQuestionAnswerService(
+            evidence=table_evidence,
+            interpreter=(
+                table_interpreter
+            ),
+            orchestration=(
+                table_orchestration
+            ),
+        )
+    )
+
     return QuestionAnswerService(
         search=search,
         planner=planner,
         evidence=evidence,
         answer=answer,
+        authorization=authorization,
         audit=audit,
         discovery_top_k=DISCOVERY_TOP_K,
+        table_answer=(
+            table_question_answer
+        ),
     )
 
 

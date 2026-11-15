@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -166,6 +166,7 @@ class FakeRepository:
         version_id: UUID,
         processing_job_id: UUID,
         parsed: ParsedDocument,
+        resolve_stored_file=None,
     ) -> None:
         assert document_id == self.document_id
         assert version_id == self.version_id

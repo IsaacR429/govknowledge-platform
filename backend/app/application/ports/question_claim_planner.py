@@ -8,16 +8,25 @@ from uuid import UUID
 @dataclass(frozen=True)
 class ClaimPlanningEvidence:
     """
-    Authorized candidate evidence that may be used
-    only for planning atomic claims.
+    Authorized candidate evidence available to the
+    untrusted claim planner.
 
-    This evidence has not yet passed the final
-    entailment/evidence-policy boundary.
+    evidence_id is request-local and is the only
+    provenance identifier the planner may select.
+
+    chunk_id remains backend-owned provenance.
     """
 
+    evidence_id: str
     chunk_id: UUID
     language: str
     content: str
+
+    def __post_init__(self) -> None:
+        if not self.evidence_id.strip():
+            raise ValueError(
+                "evidence_id cannot be empty."
+            )
 
 
 @dataclass(frozen=True)
@@ -35,13 +44,27 @@ class QuestionClaimPlanningRequest:
 @dataclass(frozen=True)
 class PlannedClaim:
     """
-    Untrusted candidate claim produced by a planner.
+    Untrusted planner selection.
 
-    It must still pass authorized retrieval,
-    same-language NLI, and AtomicEvidencePolicy.
+    The planner identifies authorized evidence and
+    quotes exact text from it. The backend must
+    independently validate both fields before the
+    claim becomes trusted provenance.
     """
 
+    evidence_id: str
     text: str
+
+    def __post_init__(self) -> None:
+        if not self.evidence_id.strip():
+            raise ValueError(
+                "evidence_id cannot be empty."
+            )
+
+        if not self.text.strip():
+            raise ValueError(
+                "Planned claim text cannot be empty."
+            )
 
 
 class QuestionClaimPlanner(Protocol):

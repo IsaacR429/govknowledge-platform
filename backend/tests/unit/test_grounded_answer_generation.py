@@ -59,10 +59,10 @@ class FakeCitationService:
 
     def build(
         self,
-        assessment,
+        evidence_result,
     ):
         self.calls.append(
-            assessment
+            evidence_result
         )
 
         return self.validated
@@ -377,3 +377,42 @@ def test_empty_generated_answer_is_rejected():
                 sufficient_result()
             ),
         )
+
+
+def test_provider_failure_with_sufficient_evidence_propagates():
+    class FailingProvider:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, request):
+            self.calls.append(request)
+            raise RuntimeError(
+                "SIMULATED_LLM_PROVIDER_FAILURE"
+            )
+
+    provider = FailingProvider()
+
+    citation_service = FakeCitationService(
+        validated_citations()
+    )
+
+    service = GroundedAnswerGenerationService(
+        citation_service=citation_service,
+        provider=provider,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="SIMULATED_LLM_PROVIDER_FAILURE",
+    ):
+        service.generate(
+            question="Quelle est la règle ?",
+            evidence_result=sufficient_result(),
+            language="fr",
+        )
+
+    # Sufficient evidence reached the provider.
+    assert len(provider.calls) == 1
+
+    # Citations were validated before provider invocation.
+    assert len(citation_service.calls) == 1

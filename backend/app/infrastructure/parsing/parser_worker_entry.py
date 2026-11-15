@@ -6,6 +6,10 @@ import os
 import time
 from pathlib import Path
 
+from app.infrastructure.parsing.table_evidence_transport import (
+    serialize_table_evidence,
+)
+
 
 def _write_result(
     path: Path,
@@ -99,10 +103,16 @@ def _serialize_parsed_document(
             }
         )
 
-    return {
+    result: dict[str, object] = {
         "pages": pages,
         "chunks": chunks,
     }
+    result.update(
+        serialize_table_evidence(
+            parsed.table_evidence
+        )
+    )
+    return result
 
 
 def _run_parse(

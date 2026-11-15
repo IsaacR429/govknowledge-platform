@@ -123,6 +123,7 @@ class RecordingRepository:
         version_id,
         processing_job_id,
         parsed,
+        resolve_stored_file=None,
     ):
         self.calls.append(
             (
@@ -307,7 +308,18 @@ def test_processing_service_marks_failure(
     file_path = tmp_path / "document.pdf"
     file_path.write_bytes(b"test")
 
-    request = make_request()
+    actor_user_id = uuid4()
+    correlation_id = uuid4()
+
+    base_request = make_request()
+
+    request = ProcessDocumentRequest(
+        processing_job_id=(
+            base_request.processing_job_id
+        ),
+        actor_user_id=actor_user_id,
+        correlation_id=correlation_id,
+    )
     target = make_target(request)
     repository = RecordingRepository(
         target
@@ -360,7 +372,35 @@ def test_processing_service_marks_failure(
         .DOCUMENT_PROCESSING_FAILED,
     ]
 
+    started = audit.calls[0]
     failed = audit.calls[1]
+
+    assert (
+        started.actor_user_id
+        == actor_user_id
+    )
+    assert (
+        started.correlation_id
+        == correlation_id
+    )
+
+    assert (
+        failed.actor_user_id
+        == actor_user_id
+    )
+    assert (
+        failed.correlation_id
+        == correlation_id
+    )
+
+    assert (
+        failed.resource_id
+        == request.processing_job_id
+    )
+    assert (
+        failed.document_id
+        == target.document_id
+    )
 
     assert failed.outcome == AuditOutcome.FAILED
 

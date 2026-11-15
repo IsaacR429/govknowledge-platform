@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+from app.application.services.claim_provenance import (
+    ClaimOrigin,
+)
 from app.application.services.sentence_evidence_verification import (
     EvidenceSpan,
 )
@@ -68,4 +71,41 @@ class EvidenceSpanCitationMapper:
             start_char=span.start_char,
             end_char=span.end_char,
             cited_text=span.text,
+        )
+
+
+class ClaimOriginCitationMapper:
+    def map(
+        self,
+        origin: ClaimOrigin,
+    ) -> Citation:
+        if origin.start_char < 0:
+            raise ValueError(
+                "Citation start offset cannot be negative."
+            )
+
+        if origin.end_char <= origin.start_char:
+            raise ValueError(
+                "Citation end offset must follow start offset."
+            )
+
+        if (
+            origin.end_char - origin.start_char
+            != len(origin.text)
+        ):
+            raise ValueError(
+                "Claim origin offsets do not match its text."
+            )
+
+        return Citation(
+            chunk_id=origin.chunk_id,
+            document_id=origin.document_id,
+            document_version_id=(
+                origin.document_version_id
+            ),
+            page_id=origin.page_id,
+            page_number=origin.page_number,
+            start_char=origin.start_char,
+            end_char=origin.end_char,
+            cited_text=origin.text,
         )
