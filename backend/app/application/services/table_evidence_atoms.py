@@ -398,6 +398,129 @@ class LabeledRowLookupRequest:
 
 
 @dataclass(frozen=True)
+class LabeledRowComparisonRequest:
+    """
+    Backend-resolved request for multiple columns belonging
+    to one authorized labeled generic row.
+    """
+
+    table_key: str
+    row_label: str
+    logical_key: str
+    column_names: tuple[str, ...]
+
+    def __post_init__(
+        self,
+    ) -> None:
+
+        for field_name, value in (
+            (
+                "table_key",
+                self.table_key,
+            ),
+            (
+                "row_label",
+                self.row_label,
+            ),
+            (
+                "logical_key",
+                self.logical_key,
+            ),
+        ):
+
+            if (
+                not isinstance(
+                    value,
+                    str,
+                )
+                or not value.strip()
+                or value != value.strip()
+            ):
+                raise ValueError(
+                    f"{field_name} cannot "
+                    "be empty or padded."
+                )
+
+        if (
+            not isinstance(
+                self.column_names,
+                tuple,
+            )
+            or len(self.column_names) < 2
+        ):
+            raise ValueError(
+                "column_names must contain "
+                "at least two values."
+            )
+
+        for column_name in self.column_names:
+
+            if (
+                not isinstance(
+                    column_name,
+                    str,
+                )
+                or not column_name.strip()
+                or column_name
+                != column_name.strip()
+            ):
+                raise ValueError(
+                    "column_names contains "
+                    "an invalid value."
+                )
+
+        if (
+            len(set(self.column_names))
+            != len(self.column_names)
+        ):
+            raise ValueError(
+                "column_names must be distinct."
+            )
+
+        table_parts = (
+            self.table_key.split("/")
+        )
+
+        if (
+            len(table_parts) != 2
+            or table_parts[0]
+            != "GENERIC"
+            or not table_parts[1]
+        ):
+            raise ValueError(
+                "table_key is not a valid "
+                "generic table identity."
+            )
+
+        logical_parts = (
+            self.logical_key.split("/")
+        )
+
+        if (
+            len(logical_parts) != 3
+            or logical_parts[0]
+            != "GENERIC"
+            or not logical_parts[1]
+            or not logical_parts[2]
+        ):
+            raise ValueError(
+                "logical_key is not a valid "
+                "generic row identity."
+            )
+
+        if (
+            "/".join(
+                logical_parts[:2]
+            )
+            != self.table_key
+        ):
+            raise ValueError(
+                "logical_key does not belong "
+                "to table_key."
+            )
+
+
+@dataclass(frozen=True)
 class TableLookupSelection:
     request: (
         TableLookupRequest
@@ -405,6 +528,23 @@ class TableLookupSelection:
     )
     row: TableEvidenceAtom
     cell: TableCellEvidenceAtom
+
+
+@dataclass(frozen=True)
+class TableComparisonSelection:
+    """
+    Multiple exact cells selected from one resolved
+    generic evidence row.
+
+    Cell order follows request.column_names order.
+    """
+
+    request: LabeledRowComparisonRequest
+    row: TableEvidenceAtom
+    cells: tuple[
+        TableCellEvidenceAtom,
+        ...,
+    ]
 
 
 class TableEvidenceAtomBuilder:
@@ -1209,12 +1349,17 @@ class TableEvidenceLookupService:
         request: (
             TableLookupRequest
             | LabeledRowLookupRequest
+            | LabeledRowComparisonRequest
         ),
         evidence: tuple[
             TableEvidenceAtom,
             ...,
         ],
-    ) -> TableLookupSelection | None:
+    ) -> (
+        TableLookupSelection
+        | TableComparisonSelection
+        | None
+    ):
 
         logical_key = (
             request.logical_key
@@ -1248,7 +1393,10 @@ class TableEvidenceLookupService:
 
         if isinstance(
             request,
-            LabeledRowLookupRequest,
+            (
+                LabeledRowLookupRequest,
+                LabeledRowComparisonRequest,
+            ),
         ):
 
             label_cells = tuple(
@@ -1284,6 +1432,69 @@ class TableEvidenceLookupService:
                         "the lookup request."
                     )
                 )
+
+        if isinstance(
+            request,
+            LabeledRowComparisonRequest,
+        ):
+
+            selected_cells = []
+
+            for column_name in (
+                request.column_names
+            ):
+
+                requested_column = (
+                    self._normalize_name(
+                        column_name
+                    )
+                )
+
+                matches = tuple(
+                    cell
+                    for cell in row.cells
+                    if (
+                        cell.column_name
+                        is not None
+                        and self._normalize_name(
+                            cell.column_name
+                        )
+                        == requested_column
+                    )
+                )
+
+                if not matches:
+                    return None
+
+                if len(matches) != 1:
+                    raise (
+                        TableEvidenceLookupError(
+                            (
+                                "Requested comparison "
+                                "column is ambiguous: "
+                                f"{column_name}"
+                            )
+                        )
+                    )
+
+                cell = matches[0]
+
+                if not cell.text.strip():
+                    return None
+
+                selected_cells.append(
+                    cell
+                )
+
+            return (
+                TableComparisonSelection(
+                    request=request,
+                    row=row,
+                    cells=tuple(
+                        selected_cells
+                    ),
+                )
+            )
 
         requested_column = (
             self._normalize_name(

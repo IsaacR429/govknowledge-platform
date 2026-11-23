@@ -231,6 +231,112 @@ class DirectTableClaimBuilder:
     connected.
     """
 
+    def build_comparison(
+        self,
+        *,
+        request,
+        selection,
+    ):
+        """
+        Build one independently provenance-validated
+        direct claim per selected comparison cell.
+
+        The existing single-cell build() path remains
+        the authority for provenance validation.
+        """
+
+        from app.application.services.table_evidence_atoms import (
+            LabeledRowComparisonRequest,
+            LabeledRowLookupRequest,
+            TableComparisonSelection,
+            TableLookupSelection,
+        )
+
+        if not isinstance(
+            request,
+            LabeledRowComparisonRequest,
+        ):
+            raise TableClaimProvenanceError(
+                "Comparison request has an "
+                "invalid type."
+            )
+
+        if not isinstance(
+            selection,
+            TableComparisonSelection,
+        ):
+            raise TableClaimProvenanceError(
+                "Comparison selection has an "
+                "invalid type."
+            )
+
+        if selection.request != request:
+            raise TableClaimProvenanceError(
+                "Comparison selection does not "
+                "belong to the request."
+            )
+
+        if (
+            selection.row.logical_key
+            != request.logical_key
+        ):
+            raise TableClaimProvenanceError(
+                "Comparison row logical key does "
+                "not match the request."
+            )
+
+        if (
+            len(selection.cells)
+            != len(request.column_names)
+        ):
+            raise TableClaimProvenanceError(
+                "Comparison selection cardinality "
+                "does not match requested columns."
+            )
+
+        claims = []
+
+        for column_name, cell in zip(
+            request.column_names,
+            selection.cells,
+            strict=True,
+        ):
+
+            single_request = (
+                LabeledRowLookupRequest(
+                    table_key=request.table_key,
+                    row_label=request.row_label,
+                    logical_key=(
+                        request.logical_key
+                    ),
+                    column_name=column_name,
+                )
+            )
+
+            single_selection = (
+                TableLookupSelection(
+                    request=single_request,
+                    row=selection.row,
+                    cell=cell,
+                )
+            )
+
+            claims.append(
+                self.build(
+                    request=single_request,
+                    selection=(
+                        single_selection
+                    ),
+                    claim_id=(
+                        f"table-claim-"
+                        f"{len(claims) + 1}"
+                    ),
+                )
+            )
+
+        return tuple(claims)
+
+
     def build(
         self,
         *,

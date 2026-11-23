@@ -165,9 +165,25 @@ class PlannedLabeledRowLookup:
     column_name: str
 
 
+@dataclass(frozen=True)
+class PlannedLabeledRowComparison:
+    """
+    Generic-table comparison plan for multiple columns
+    belonging to one labeled logical row.
+
+    logical_key is intentionally absent. The trusted
+    interpreter resolves it from authorized vocabulary.
+    """
+
+    table_key: str
+    row_label: str
+    column_names: tuple[str, ...]
+
+
 TableQuestionPlan = (
     PlannedTableLookup
     | PlannedLabeledRowLookup
+    | PlannedLabeledRowComparison
 )
 
 

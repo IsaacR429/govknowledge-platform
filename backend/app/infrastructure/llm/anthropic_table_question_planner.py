@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from app.application.ports.table_question_planner import (
+    PlannedLabeledRowComparison,
     PlannedLabeledRowLookup,
     PlannedTableLookup,
     TableQuestionPlan,
@@ -16,7 +17,8 @@ SYSTEM_PROMPT = """
 You are a structural table-question interpreter.
 
 Your task is ONLY to determine whether the user's question
-requests one exact value from an authorized table using the
+requests either one exact value or a comparison of multiple
+columns from one labeled row in an authorized table using the
 structural vocabulary supplied by the backend.
 
 The backend may supply two table structures:
@@ -67,7 +69,27 @@ For a generic labeled-row lookup, return exactly:
   "column_name":"one column name supplied for that table"
 }
 
-Never mix fields from the two lookup shapes.
+For a comparison across two or more columns of the same
+generic labeled row, return exactly:
+
+{
+  "decision":"LABELED_ROW_COMPARISON",
+  "table_key":"one supplied generic table_key",
+  "row_label":"one row label supplied for that table",
+  "column_names":[
+    "first supplied column name",
+    "second supplied column name"
+  ]
+}
+
+For LABELED_ROW_COMPARISON:
+- column_names must contain at least two distinct names;
+- every name must come from the selected table's supplied
+  column_names;
+- all requested columns must belong to the same table and row;
+- do not use this decision for a single-column question.
+
+Never mix fields from the lookup or comparison shapes.
 
 Return JSON only.
 Do not use markdown fences.
@@ -427,6 +449,124 @@ class AnthropicTableQuestionPlanner(
                 ),
                 column_name=(
                     column_name.strip()
+                ),
+            )
+
+        # ====================================================
+        # GENERIC LABELED-ROW COMPARISON
+        # ====================================================
+
+        if (
+            decision
+            == "LABELED_ROW_COMPARISON"
+        ):
+
+            if set(decoded) != {
+                "decision",
+                "table_key",
+                "row_label",
+                "column_names",
+            }:
+                raise (
+                    AnthropicTableQuestionPlannerResponseError(
+                        "Anthropic returned an invalid "
+                        "labeled-row comparison shape."
+                    )
+                )
+
+            table_key = decoded.get(
+                "table_key"
+            )
+
+            row_label = decoded.get(
+                "row_label"
+            )
+
+            column_names = decoded.get(
+                "column_names"
+            )
+
+            for field_name, value in (
+                (
+                    "table key",
+                    table_key,
+                ),
+                (
+                    "row label",
+                    row_label,
+                ),
+            ):
+
+                if (
+                    not isinstance(
+                        value,
+                        str,
+                    )
+                    or not value.strip()
+                ):
+                    raise (
+                        AnthropicTableQuestionPlannerResponseError(
+                            "Anthropic returned an "
+                            f"invalid {field_name}."
+                        )
+                    )
+
+            if (
+                not isinstance(
+                    column_names,
+                    list,
+                )
+                or len(column_names) < 2
+            ):
+                raise (
+                    AnthropicTableQuestionPlannerResponseError(
+                        "Anthropic returned invalid "
+                        "comparison columns."
+                    )
+                )
+
+            cleaned_column_names = []
+
+            for column_name in column_names:
+
+                if (
+                    not isinstance(
+                        column_name,
+                        str,
+                    )
+                    or not column_name.strip()
+                ):
+                    raise (
+                        AnthropicTableQuestionPlannerResponseError(
+                            "Anthropic returned an invalid "
+                            "comparison column name."
+                        )
+                    )
+
+                cleaned_column_names.append(
+                    column_name.strip()
+                )
+
+            if (
+                len(set(cleaned_column_names))
+                != len(cleaned_column_names)
+            ):
+                raise (
+                    AnthropicTableQuestionPlannerResponseError(
+                        "Anthropic returned duplicate "
+                        "comparison columns."
+                    )
+                )
+
+            return PlannedLabeledRowComparison(
+                table_key=(
+                    table_key.strip()
+                ),
+                row_label=(
+                    row_label.strip()
+                ),
+                column_names=tuple(
+                    cleaned_column_names
                 ),
             )
 

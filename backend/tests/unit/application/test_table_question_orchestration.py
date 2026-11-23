@@ -7,6 +7,7 @@ from app.application.services.table_claim_provenance import (
     TableAtomicClaim,
 )
 from app.application.services.table_evidence_atoms import (
+    LabeledRowComparisonRequest,
     TableLookupRequest,
 )
 from app.application.services.table_question_orchestration import (
@@ -169,6 +170,91 @@ class RecordingAnswer:
             ),
         )
 
+
+
+class RecordingComparisonClaimBuilder:
+    def __init__(
+        self,
+        claims,
+        events,
+    ):
+        self.claims = claims
+        self.events = events
+        self.calls = []
+
+    def build_comparison(
+        self,
+        *,
+        request,
+        selection,
+    ):
+        self.events.append(
+            "comparison_claim_builder"
+        )
+
+        self.calls.append(
+            (
+                request,
+                selection,
+            )
+        )
+
+        return self.claims
+
+
+class RecordingComparisonAnswer:
+    def __init__(
+        self,
+        events,
+    ):
+        self.events = events
+        self.calls = []
+
+    def generate_comparison(
+        self,
+        *,
+        identity,
+        question,
+        claims,
+        correlation_id,
+        language,
+    ):
+        self.events.append(
+            "comparison_answer"
+        )
+
+        self.calls.append(
+            {
+                "identity": identity,
+                "question": question,
+                "claims": claims,
+                "correlation_id": (
+                    correlation_id
+                ),
+                "language": language,
+            }
+        )
+
+        return GroundedAnswerResult(
+            correlation_id=(
+                correlation_id
+            ),
+            status="SUPPORTED",
+            answer=(
+                "Celluleanimale: Absents; "
+                "Cellulev\u00e9g\u00e9tale: "
+                "Pr\u00e9sents"
+            ),
+            citations=(
+                ValidatedCitationSet(
+                    citations=()
+                )
+            ),
+            cited_evidence_ids=tuple(
+                claim.claim_id
+                for claim in claims
+            ),
+        )
 
 def lookup_request(
     *,
@@ -427,4 +513,165 @@ def test_preserves_one_correlation_id_through_pipeline():
     assert (
         result.correlation_id
         == correlation_id
+    )
+
+
+def comparison_request():
+
+    table_key = (
+        "GENERIC/"
+        + "a" * 64
+    )
+
+    return LabeledRowComparisonRequest(
+        table_key=table_key,
+        row_label="Chloroplastes",
+        logical_key=(
+            table_key
+            + "/"
+            + "b" * 64
+        ),
+        column_names=(
+            "Celluleanimale",
+            "Cellulev\u00e9g\u00e9tale",
+        ),
+    )
+
+
+def test_orchestrates_comparison_claims_before_comparison_answer():
+
+    events = []
+
+    selection = object()
+
+    first = type(
+        "TestClaim",
+        (),
+        {
+            "text": "Absents",
+            "claim_id": (
+                "table-claim-animal"
+            ),
+        },
+    )()
+
+    second = type(
+        "TestClaim",
+        (),
+        {
+            "text": "Pr\u00e9sents",
+            "claim_id": (
+                "table-claim-plant"
+            ),
+        },
+    )()
+
+    claims = (
+        first,
+        second,
+    )
+
+    evidence = RecordingEvidence(
+        selection=selection,
+        events=events,
+    )
+
+    builder = (
+        RecordingComparisonClaimBuilder(
+            claims=claims,
+            events=events,
+        )
+    )
+
+    answer = (
+        RecordingComparisonAnswer(
+            events=events,
+        )
+    )
+
+    identity = object()
+
+    request = comparison_request()
+
+    correlation_id = uuid4()
+
+    result = (
+        TableQuestionOrchestrationService(
+            evidence=evidence,
+            claim_builder=builder,
+            answer=answer,
+        )
+        .answer_lookup(
+            identity=identity,
+            question=(
+                "Compare les chloroplastes "
+                "chez la cellule animale "
+                "et la cellule v\u00e9g\u00e9tale."
+            ),
+            request=request,
+            language="fr",
+            correlation_id=(
+                correlation_id
+            ),
+        )
+    )
+
+    assert events == [
+        "authorized_lookup",
+        "comparison_claim_builder",
+        "comparison_answer",
+    ]
+
+    assert (
+        evidence.calls
+        == [
+            (
+                identity,
+                request,
+            )
+        ]
+    )
+
+    assert (
+        builder.calls
+        == [
+            (
+                request,
+                selection,
+            )
+        ]
+    )
+
+    assert (
+        answer.calls[0][
+            "claims"
+        ]
+        is claims
+    )
+
+    assert (
+        answer.calls[0][
+            "language"
+        ]
+        == "fr"
+    )
+
+    assert (
+        answer.calls[0][
+            "correlation_id"
+        ]
+        == correlation_id
+    )
+
+    assert (
+        result.correlation_id
+        == correlation_id
+    )
+
+    assert (
+        result.cited_evidence_ids
+        == (
+            "table-claim-animal",
+            "table-claim-plant",
+        )
     )

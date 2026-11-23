@@ -7,12 +7,14 @@ from app.application.ports.table_evidence_repository import (
 )
 from app.application.ports.table_question_planner import (
     GenericTablePlanningDescriptor,
+    PlannedLabeledRowComparison,
     PlannedLabeledRowLookup,
     PlannedTableLookup,
     TableQuestionPlanner,
     TableQuestionPlanningContext,
 )
 from app.application.services.table_evidence_atoms import (
+    LabeledRowComparisonRequest,
     LabeledRowLookupRequest,
     TableLookupRequest,
 )
@@ -125,6 +127,7 @@ class ValidatedTableQuestionInterpreter:
     ) -> (
         TableLookupRequest
         | LabeledRowLookupRequest
+        | LabeledRowComparisonRequest
         | None
     ):
 
@@ -314,6 +317,118 @@ class ValidatedTableQuestionInterpreter:
                     row.logical_key
                 ),
                 column_name=column_name,
+            )
+
+        # ====================================================
+        # GENERIC LABELED-ROW COMPARISON PLAN
+        # ====================================================
+
+        if isinstance(
+            plan,
+            PlannedLabeledRowComparison,
+        ):
+
+            clean_table_key = (
+                plan.table_key.strip()
+            )
+
+            matching_tables = tuple(
+                table
+                for table in generic_tables
+                if (
+                    table.table_key
+                    == clean_table_key
+                )
+            )
+
+            if len(matching_tables) != 1:
+                raise (
+                    InvalidTableQuestionPlanError(
+                        "Planner returned an "
+                        "unknown or ambiguous "
+                        "table_key."
+                    )
+                )
+
+            table = matching_tables[0]
+
+            row_label = _resolve_unique(
+                candidate=plan.row_label,
+                allowed=tuple(
+                    row.label
+                    for row in table.rows
+                ),
+                field_name="row_label",
+            )
+
+            matching_rows = tuple(
+                row
+                for row in table.rows
+                if row.label == row_label
+            )
+
+            if len(matching_rows) != 1:
+                raise (
+                    InvalidTableQuestionPlanError(
+                        "Authorized generic row "
+                        "label is ambiguous."
+                    )
+                )
+
+            if len(plan.column_names) < 2:
+                raise (
+                    InvalidTableQuestionPlanError(
+                        "Comparison requires at "
+                        "least two columns."
+                    )
+                )
+
+            if (
+                len(set(plan.column_names))
+                != len(plan.column_names)
+            ):
+                raise (
+                    InvalidTableQuestionPlanError(
+                        "Comparison columns must "
+                        "be distinct."
+                    )
+                )
+
+            resolved_column_names = tuple(
+                _resolve_unique(
+                    candidate=column_name,
+                    allowed=(
+                        table.column_names
+                    ),
+                    field_name="column_name",
+                )
+                for column_name
+                in plan.column_names
+            )
+
+            if (
+                len(set(resolved_column_names))
+                != len(resolved_column_names)
+            ):
+                raise (
+                    InvalidTableQuestionPlanError(
+                        "Comparison columns must "
+                        "resolve to distinct "
+                        "authorized columns."
+                    )
+                )
+
+            row = matching_rows[0]
+
+            return LabeledRowComparisonRequest(
+                table_key=table.table_key,
+                row_label=row.label,
+                logical_key=(
+                    row.logical_key
+                ),
+                column_names=(
+                    resolved_column_names
+                ),
             )
 
         raise InvalidTableQuestionPlanError(

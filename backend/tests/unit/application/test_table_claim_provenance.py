@@ -8,6 +8,8 @@ from app.application.services.table_claim_provenance import (
     TableClaimProvenanceError,
 )
 from app.application.services.table_evidence_atoms import (
+    LabeledRowComparisonRequest,
+    TableComparisonSelection,
     TableCellEvidenceAtom,
     TableEvidenceAtom,
     TableLookupRequest,
@@ -308,3 +310,187 @@ def test_missing_origin_fails_closed():
                 selection=selected,
             )
         )
+
+
+def test_comparison_builds_one_direct_claim_per_selected_cell():
+
+    _, base_selection = selection()
+
+    table_key = (
+        "GENERIC/"
+        + "a" * 64
+    )
+
+    logical_key = (
+        table_key
+        + "/"
+        + "b" * 64
+    )
+
+    label = TableCellEvidenceAtom(
+        column_start=0,
+        column_end=1,
+        column_name="Crit\u00e8res",
+        text="Chloroplastes",
+        value_source=(
+            TableCellValueSource.SOURCE_TEXT
+        ),
+        origin_spans=(
+            span(
+                page=4,
+                text="Chloroplastes",
+            ),
+        ),
+        structure_spans=(),
+    )
+
+    animal = TableCellEvidenceAtom(
+        column_start=1,
+        column_end=2,
+        column_name="Celluleanimale",
+        text="Absents",
+        value_source=(
+            TableCellValueSource.SOURCE_TEXT
+        ),
+        origin_spans=(
+            span(
+                page=4,
+                text="Absents",
+            ),
+        ),
+        structure_spans=(
+            span(
+                page=4,
+                kind=(
+                    TableSpanKind.STRUCTURE
+                ),
+            ),
+        ),
+    )
+
+    plant = TableCellEvidenceAtom(
+        column_start=2,
+        column_end=3,
+        column_name=(
+            "Cellulev\u00e9g\u00e9tale"
+        ),
+        text=(
+            "Pr\u00e9sents "
+            "(contiennent la chlorophylle "
+            "pour la photosynth\u00e8se)"
+        ),
+        value_source=(
+            TableCellValueSource.SOURCE_TEXT
+        ),
+        origin_spans=(
+            span(
+                page=4,
+                text=(
+                    "Pr\u00e9sents "
+                    "(contiennent la chlorophylle "
+                    "pour la photosynth\u00e8se)"
+                ),
+            ),
+        ),
+        structure_spans=(
+            span(
+                page=4,
+                kind=(
+                    TableSpanKind.STRUCTURE
+                ),
+            ),
+        ),
+    )
+
+    evidence_row = replace(
+        base_selection.row,
+        logical_key=logical_key,
+        section_key=None,
+        column_names=(
+            "Crit\u00e8res",
+            "Celluleanimale",
+            "Cellulev\u00e9g\u00e9tale",
+        ),
+        cells=(
+            label,
+            animal,
+            plant,
+        ),
+    )
+
+    request = LabeledRowComparisonRequest(
+        table_key=table_key,
+        row_label="Chloroplastes",
+        logical_key=logical_key,
+        column_names=(
+            "Celluleanimale",
+            "Cellulev\u00e9g\u00e9tale",
+        ),
+    )
+
+    selected = TableComparisonSelection(
+        request=request,
+        row=evidence_row,
+        cells=(
+            animal,
+            plant,
+        ),
+    )
+
+    claims = (
+        DirectTableClaimBuilder()
+        .build_comparison(
+            request=request,
+            selection=selected,
+        )
+    )
+
+    assert len(claims) == 2
+
+    assert (
+        tuple(
+            claim.claim_id
+            for claim in claims
+        )
+        == (
+            "table-claim-1",
+            "table-claim-2",
+        )
+    )
+
+    assert (
+        tuple(
+            claim.text
+            for claim in claims
+        )
+        == (
+            "Absents",
+            (
+                "Pr\u00e9sents "
+                "(contiennent la chlorophylle "
+                "pour la photosynth\u00e8se)"
+            ),
+        )
+    )
+
+    assert (
+        tuple(
+            claim.origin.column_name
+            for claim in claims
+        )
+        == (
+            "Celluleanimale",
+            "Cellulev\u00e9g\u00e9tale",
+        )
+    )
+
+    assert all(
+        claim.origin.logical_key
+        == logical_key
+        for claim in claims
+    )
+
+    assert all(
+        claim.origin.page_number == 4
+        for claim in claims
+    )

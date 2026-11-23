@@ -18,6 +18,7 @@ from app.application.services.table_claim_provenance import (
     DirectTableClaimBuilder,
 )
 from app.application.services.table_evidence_atoms import (
+    LabeledRowComparisonRequest,
     LabeledRowLookupRequest,
     TableLookupRequest,
 )
@@ -79,6 +80,7 @@ class TableQuestionOrchestrationService:
         request: (
             TableLookupRequest
             | LabeledRowLookupRequest
+            | LabeledRowComparisonRequest
         ),
         language: str = "fr",
         correlation_id: UUID | None = None,
@@ -132,6 +134,43 @@ class TableQuestionOrchestrationService:
                     identity=identity,
                     question=clean_question,
                     claim=None,
+                    correlation_id=(
+                        operation_id
+                    ),
+                    language=(
+                        clean_language
+                    ),
+                )
+            )
+
+        # --------------------------------------------
+        # Multi-column generic comparison.
+        #
+        # Retrieval already guarantees that all cells
+        # belong to one resolved logical row.
+        # Each cell is provenance-validated separately
+        # before disclosure.
+        # --------------------------------------------
+
+        if isinstance(
+            request,
+            LabeledRowComparisonRequest,
+        ):
+
+            claims = (
+                self._claim_builder
+                .build_comparison(
+                    request=request,
+                    selection=selection,
+                )
+            )
+
+            return (
+                self._answer
+                .generate_comparison(
+                    identity=identity,
+                    question=clean_question,
+                    claims=claims,
                     correlation_id=(
                         operation_id
                     ),

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from app.application.ports.table_evidence_repository import (
@@ -7,6 +9,7 @@ from app.application.ports.table_evidence_repository import (
     AuthorizedLabeledRow,
 )
 from app.application.ports.table_question_planner import (
+    PlannedLabeledRowComparison,
     PlannedLabeledRowLookup,
 )
 from app.application.services.table_evidence_atoms import (
@@ -272,3 +275,144 @@ def test_no_table_vocabulary_never_calls_planner():
     )
 
     assert result is None
+
+
+def comparison_table():
+    return replace(
+        generic_table(
+            column="Celluleanimale",
+        ),
+        column_names=(
+            "Feature",
+            "Celluleanimale",
+            "Cellulev\u00e9g\u00e9tale",
+        ),
+    )
+
+
+def test_generic_comparison_plan_resolves_one_authorized_row():
+
+    table = comparison_table()
+
+    planner = FakePlanner(
+        PlannedLabeledRowComparison(
+            table_key=table.table_key,
+            row_label="Output",
+            column_names=(
+                "Celluleanimale",
+                "Cellulev\u00e9g\u00e9tale",
+            ),
+        )
+    )
+
+    result = (
+        ValidatedTableQuestionInterpreter(
+            planner=planner
+        )
+        .interpret(
+            question=(
+                "Compare les deux valeurs."
+            ),
+            language="fr",
+            section_keys=(),
+            column_names=(),
+            generic_tables=(
+                table,
+            ),
+        )
+    )
+
+    assert (
+        type(result).__name__
+        == "LabeledRowComparisonRequest"
+    )
+
+    assert (
+        result.table_key
+        == table.table_key
+    )
+
+    assert result.row_label == "Output"
+
+    assert (
+        result.logical_key
+        == table.rows[0].logical_key
+    )
+
+    assert (
+        result.column_names
+        == (
+            "Celluleanimale",
+            "Cellulev\u00e9g\u00e9tale",
+        )
+    )
+
+
+def test_generic_comparison_rejects_unknown_column():
+
+    table = comparison_table()
+
+    planner = FakePlanner(
+        PlannedLabeledRowComparison(
+            table_key=table.table_key,
+            row_label="Output",
+            column_names=(
+                "Celluleanimale",
+                "UnknownColumn",
+            ),
+        )
+    )
+
+    with pytest.raises(
+        InvalidTableQuestionPlanError,
+        match="column",
+    ):
+        (
+            ValidatedTableQuestionInterpreter(
+                planner=planner
+            )
+            .interpret(
+                question="Compare the values.",
+                language="en",
+                section_keys=(),
+                column_names=(),
+                generic_tables=(
+                    table,
+                ),
+            )
+        )
+
+
+def test_generic_comparison_rejects_duplicate_columns():
+
+    table = comparison_table()
+
+    planner = FakePlanner(
+        PlannedLabeledRowComparison(
+            table_key=table.table_key,
+            row_label="Output",
+            column_names=(
+                "Celluleanimale",
+                "Celluleanimale",
+            ),
+        )
+    )
+
+    with pytest.raises(
+        InvalidTableQuestionPlanError,
+        match="distinct",
+    ):
+        (
+            ValidatedTableQuestionInterpreter(
+                planner=planner
+            )
+            .interpret(
+                question="Compare the values.",
+                language="en",
+                section_keys=(),
+                column_names=(),
+                generic_tables=(
+                    table,
+                ),
+            )
+        )

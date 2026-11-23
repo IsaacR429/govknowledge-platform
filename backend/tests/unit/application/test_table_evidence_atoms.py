@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -9,6 +10,7 @@ from app.application.services.table_evidence_atoms import (
     TableEvidenceAtomBuilder,
     TableEvidenceBuildError,
     TableEvidenceLookupError,
+    LabeledRowComparisonRequest,
     LabeledRowLookupRequest,
     TableEvidenceLookupService,
     TableLookupRequest,
@@ -1520,3 +1522,273 @@ def test_builder_uses_one_generic_table_identity_for_approved_sequence():
         page_four_atom.source_table_refs
         == ("bio:p4",)
     )
+
+
+def test_labeled_row_comparison_selects_multiple_cells_from_same_row():
+
+    source = generic_three_column_table(
+        rows=(
+            row(
+                page=3,
+                index=1,
+                values=(
+                    "Output",
+                    "A 3-digit score",
+                    "Monthly EMI",
+                ),
+            ),
+        ),
+    )
+
+    atoms = (
+        TableEvidenceAtomBuilder()
+        .build_sequence(
+            tables=(
+                source,
+            ),
+            context=generic_context(),
+        )
+    )
+
+    assert len(atoms) == 1
+
+    target = atoms[0]
+
+    assert target.logical_key is not None
+
+    parts = (
+        target.logical_key.split("/")
+    )
+
+    request = LabeledRowComparisonRequest(
+        table_key="/".join(
+            parts[:2]
+        ),
+        row_label="Output",
+        logical_key=(
+            target.logical_key
+        ),
+        column_names=(
+            "Indian EMI Calculator System",
+            "Credit Score System",
+        ),
+    )
+
+    selection = (
+        TableEvidenceLookupService()
+        .lookup(
+            request=request,
+            evidence=atoms,
+        )
+    )
+
+    assert selection is not None
+
+    assert (
+        selection.row.logical_key
+        == target.logical_key
+    )
+
+    assert (
+        tuple(
+            cell.column_name
+            for cell in selection.cells
+        )
+        == (
+            "Indian EMI Calculator System",
+            "Credit Score System",
+        )
+    )
+
+    assert (
+        tuple(
+            cell.text
+            for cell in selection.cells
+        )
+        == (
+            "Monthly EMI",
+            "A 3-digit score",
+        )
+    )
+
+    assert all(
+        cell in selection.row.cells
+        for cell in selection.cells
+    )
+
+
+def test_labeled_row_comparison_returns_none_for_missing_cell():
+
+    source = generic_three_column_table(
+        rows=(
+            row(
+                page=3,
+                index=1,
+                values=(
+                    "Output",
+                    "A 3-digit score",
+                    "Monthly EMI",
+                ),
+            ),
+        ),
+    )
+
+    atoms = (
+        TableEvidenceAtomBuilder()
+        .build_sequence(
+            tables=(source,),
+            context=generic_context(),
+        )
+    )
+
+    target = atoms[0]
+
+    assert target.logical_key is not None
+
+    parts = target.logical_key.split("/")
+
+    request = LabeledRowComparisonRequest(
+        table_key="/".join(
+            parts[:2]
+        ),
+        row_label="Output",
+        logical_key=target.logical_key,
+        column_names=(
+            "Credit Score System",
+            "Missing Column",
+        ),
+    )
+
+    result = (
+        TableEvidenceLookupService()
+        .lookup(
+            request=request,
+            evidence=atoms,
+        )
+    )
+
+    assert result is None
+
+
+def test_labeled_row_comparison_fails_closed_on_ambiguous_cell():
+
+    source = generic_three_column_table(
+        rows=(
+            row(
+                page=3,
+                index=1,
+                values=(
+                    "Output",
+                    "A 3-digit score",
+                    "Monthly EMI",
+                ),
+            ),
+        ),
+    )
+
+    atoms = (
+        TableEvidenceAtomBuilder()
+        .build_sequence(
+            tables=(source,),
+            context=generic_context(),
+        )
+    )
+
+    target = atoms[0]
+
+    assert target.logical_key is not None
+
+    parts = target.logical_key.split("/")
+
+    # Deliberately make the first requested value
+    # ambiguous inside the same resolved row.
+    ambiguous_target = replace(
+        target,
+        cells=(
+            target.cells
+            + (
+                target.cells[1],
+            )
+        ),
+    )
+
+    request = LabeledRowComparisonRequest(
+        table_key="/".join(
+            parts[:2]
+        ),
+        row_label="Output",
+        logical_key=target.logical_key,
+        column_names=(
+            "Credit Score System",
+            "Indian EMI Calculator System",
+        ),
+    )
+
+    with pytest.raises(
+        TableEvidenceLookupError,
+        match="ambiguous",
+    ):
+        (
+            TableEvidenceLookupService()
+            .lookup(
+                request=request,
+                evidence=(
+                    ambiguous_target,
+                ),
+            )
+        )
+
+
+def test_labeled_row_comparison_rejects_wrong_row_label():
+
+    source = generic_three_column_table(
+        rows=(
+            row(
+                page=3,
+                index=1,
+                values=(
+                    "Output",
+                    "A 3-digit score",
+                    "Monthly EMI",
+                ),
+            ),
+        ),
+    )
+
+    atoms = (
+        TableEvidenceAtomBuilder()
+        .build_sequence(
+            tables=(source,),
+            context=generic_context(),
+        )
+    )
+
+    target = atoms[0]
+
+    assert target.logical_key is not None
+
+    parts = target.logical_key.split("/")
+
+    request = LabeledRowComparisonRequest(
+        table_key="/".join(
+            parts[:2]
+        ),
+        row_label="Purpose",
+        logical_key=target.logical_key,
+        column_names=(
+            "Credit Score System",
+            "Indian EMI Calculator System",
+        ),
+    )
+
+    with pytest.raises(
+        TableEvidenceLookupError,
+        match="row label",
+    ):
+        (
+            TableEvidenceLookupService()
+            .lookup(
+                request=request,
+                evidence=atoms,
+            )
+        )

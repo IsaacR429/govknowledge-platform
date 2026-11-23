@@ -1,4 +1,5 @@
-﻿from uuid import uuid4
+﻿from dataclasses import replace
+from uuid import uuid4
 
 from app.application.services.table_citation_validation import (
     TableCitation,
@@ -366,4 +367,169 @@ def test_answer_citation_uses_same_claim_id():
     assert (
         entry.claim
         == selected_claim.text
+    )
+
+
+def test_comparison_answer_revalidates_and_cites_every_claim():
+
+    first = claim()
+
+    first_origin = replace(
+        first.origin,
+        logical_key=(
+            "GENERIC/"
+            + "a" * 64
+            + "/"
+            + "b" * 64
+        ),
+        section_key=None,
+        column_name="Celluleanimale",
+        text="Absents",
+    )
+
+    first = replace(
+        first,
+        claim_id="table-claim-animal",
+        text="Absents",
+        origin=first_origin,
+    )
+
+    second_origin = replace(
+        first.origin,
+        column_name=(
+            "Cellulev\u00e9g\u00e9tale"
+        ),
+        text=(
+            "Pr\u00e9sents "
+            "(contiennent la chlorophylle "
+            "pour la photosynth\u00e8se)"
+        ),
+    )
+
+    second = replace(
+        first,
+        claim_id="table-claim-plant",
+        text=(
+            "Pr\u00e9sents "
+            "(contiennent la chlorophylle "
+            "pour la photosynth\u00e8se)"
+        ),
+        origin=second_origin,
+    )
+
+    validator = (
+        RecordingCitationValidator()
+    )
+
+    identity = object()
+
+    correlation_id = uuid4()
+
+    result = (
+        TableGroundedAnswerGenerationService(
+            citation_validator=validator
+        )
+        .generate_comparison(
+            identity=identity,
+            question=(
+                "Compare les chloroplastes "
+                "chez la cellule animale "
+                "et la cellule v\u00e9g\u00e9tale."
+            ),
+            claims=(
+                first,
+                second,
+            ),
+            correlation_id=(
+                correlation_id
+            ),
+            language="fr",
+        )
+    )
+
+    assert (
+        result.correlation_id
+        == correlation_id
+    )
+
+    assert result.status == "SUPPORTED"
+
+    assert (
+        result.answer
+        == (
+            "Celluleanimale: Absents; "
+            "Cellulev\u00e9g\u00e9tale: "
+            "Pr\u00e9sents "
+            "(contiennent la chlorophylle "
+            "pour la photosynth\u00e8se)"
+        )
+    )
+
+    assert (
+        result.cited_evidence_ids
+        == (
+            "table-claim-animal",
+            "table-claim-plant",
+        )
+    )
+
+    assert (
+        len(
+            result.citations.citations
+        )
+        == 2
+    )
+
+    assert (
+        tuple(
+            entry.claim_id
+            for entry
+            in result.citations.citations
+        )
+        == (
+            "table-claim-animal",
+            "table-claim-plant",
+        )
+    )
+
+    assert (
+        tuple(
+            entry.citation.column_name
+            for entry
+            in result.citations.citations
+        )
+        == (
+            "Celluleanimale",
+            "Cellulev\u00e9g\u00e9tale",
+        )
+    )
+
+    assert (
+        tuple(
+            entry.citation.cited_text
+            for entry
+            in result.citations.citations
+        )
+        == (
+            "Absents",
+            (
+                "Pr\u00e9sents "
+                "(contiennent la chlorophylle "
+                "pour la photosynth\u00e8se)"
+            ),
+        )
+    )
+
+    assert (
+        validator.calls
+        == [
+            (
+                identity,
+                first,
+            ),
+            (
+                identity,
+                second,
+            ),
+        ]
     )
