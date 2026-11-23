@@ -290,6 +290,106 @@ def test_run_parse_produces_canonical_contract(
     assert '"file_path"' not in serialized
 
 
+
+def test_run_parse_captures_physical_tables_before_pymupdf4llm_import(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    PyMuPDF4LLM import mutates PyMuPDF table-text
+    extraction behaviour in-process.
+
+    Authoritative physical table evidence must
+    therefore be captured before pymupdf4llm is
+    imported.
+    """
+    import builtins
+
+    from app.infrastructure.parsing import (
+        pymupdf_table_evidence,
+    )
+
+    source = tmp_path / "document.pdf"
+    source.write_bytes(b"%PDF-test")
+
+    install_fake_runtime(
+        monkeypatch,
+        markdown_pages=[
+            "Page one.",
+        ],
+        native_pages=[
+            "native one",
+        ],
+        image_counts=[
+            0,
+        ],
+    )
+
+    events: list[str] = []
+
+    original_import = builtins.__import__
+
+    def tracking_import(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "pymupdf4llm":
+            events.append(
+                "import:pymupdf4llm"
+            )
+
+        return original_import(
+            name,
+            globals,
+            locals,
+            fromlist,
+            level,
+        )
+
+    def fake_extract_physical(
+        page: object,
+        *,
+        page_number: int,
+    ) -> list[dict[str, object]]:
+        events.append(
+            f"physical:{page_number}"
+        )
+
+        return []
+
+    monkeypatch.setattr(
+        builtins,
+        "__import__",
+        tracking_import,
+    )
+
+    monkeypatch.setattr(
+        pymupdf_table_evidence,
+        "extract_physical_table_evidence",
+        fake_extract_physical,
+    )
+
+    worker._run_parse(
+        file_path=source,
+        language="en",
+        max_chunk_chars=1500,
+    )
+
+    assert "physical:1" in events
+    assert "import:pymupdf4llm" in events
+
+    assert (
+        events.index("physical:1")
+        < events.index(
+            "import:pymupdf4llm"
+        )
+    )
+
+
+
 def test_run_parse_rejects_page_count_mismatch(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

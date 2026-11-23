@@ -199,7 +199,6 @@ def _run_parse(
     setup_started = time.perf_counter()
 
     import pymupdf
-    import pymupdf4llm
 
     if __package__:
         from .pymupdf_table_evidence import (
@@ -234,6 +233,59 @@ def _run_parse(
         time.perf_counter()
     )
 
+    table_evidence: list[
+        dict[str, object]
+    ] = []
+
+    native_table_counts: dict[
+        int,
+        int,
+    ] = {}
+
+    # Capture authoritative table evidence before
+    # importing pymupdf4llm. Importing pymupdf4llm
+    # mutates PyMuPDF table-text extraction behaviour
+    # in-process and can collapse word boundaries.
+    with pymupdf.open(
+        str(source)
+    ) as pdf:
+
+        table_evidence.extend(
+            extract_structural_table_evidence(
+                pdf
+            )
+        )
+
+        for offset in range(
+            pdf.page_count
+        ):
+            page_number = offset + 1
+
+            pdf_page = pdf.load_page(
+                offset
+            )
+
+            page_table_evidence = (
+                extract_physical_table_evidence(
+                    pdf_page,
+                    page_number=page_number,
+                )
+            )
+
+            native_table_counts[
+                page_number
+            ] = len(
+                page_table_evidence
+            )
+
+            table_evidence.extend(
+                page_table_evidence
+            )
+
+    # Import only after authoritative table evidence
+    # has been captured.
+    import pymupdf4llm
+
     page_chunks = (
         pymupdf4llm.to_markdown(
             str(source),
@@ -260,21 +312,11 @@ def _run_parse(
         dict[str, object]
     ] = []
 
-    table_evidence: list[
-        dict[str, object]
-    ] = []
-
     chunk_index = 0
 
     with pymupdf.open(
         str(source)
     ) as pdf:
-
-        table_evidence.extend(
-            extract_structural_table_evidence(
-                pdf
-            )
-        )
 
         if len(page_chunks) != pdf.page_count:
             raise ValueError(
@@ -353,25 +395,15 @@ def _run_parse(
                     image_count,
             }
 
-            page_table_evidence = (
-                extract_physical_table_evidence(
-                    pdf_page,
-                    page_number=page_number,
-                )
-            )
-
-            table_evidence.extend(
-                page_table_evidence
-            )
-
             page_metadata = (
                 metadata.copy()
             )
 
             page_metadata[
                 "native_table_count"
-            ] = len(
-                page_table_evidence
+            ] = native_table_counts.get(
+                page_number,
+                0,
             )
 
             pages.append(
