@@ -403,6 +403,67 @@ def test_authorized_vocabulary_does_not_leak():
         print("POISONED-SCOPE ATTACK BLOCKED: PASS")
 
         # ----------------------------------------------------
+        # ADMIN implicit READ must expose vocabulary from
+        # active documents even without DocumentPermission.
+        # ----------------------------------------------------
+
+        admin_identity = CurrentIdentity(
+            user_id=user_id,
+            username=username,
+            display_name="Table Vocabulary QA Admin",
+            email=None,
+            department="QA",
+            language_preference="fr",
+            roles=("ADMIN",),
+        )
+
+        admin_scope = (
+            authorization.retrieval_scope(
+                admin_identity
+            )
+        )
+
+        assert (
+            authorized_document_id
+            in admin_scope.document_ids
+        )
+
+        assert (
+            secret_document_id
+            in admin_scope.document_ids
+        )
+
+        admin_vocabulary = (
+            service.vocabulary(
+                identity=admin_identity
+            )
+        )
+
+        print(
+            "ADMIN SECTION KEYS:",
+            admin_vocabulary.section_keys,
+        )
+
+        print(
+            "ADMIN COLUMN NAMES:",
+            admin_vocabulary.column_names,
+        )
+
+        assert (
+            "SECRET_LOT"
+            in admin_vocabulary.section_keys
+        )
+
+        assert (
+            "Confidential Salary"
+            in admin_vocabulary.column_names
+        )
+
+        print(
+            "ADMIN IMPLICIT READ VOCABULARY: PASS"
+        )
+
+        # ----------------------------------------------------
         # Revoke READ but retain old poisoned scope object.
         # ----------------------------------------------------
 

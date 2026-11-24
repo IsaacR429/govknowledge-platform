@@ -525,31 +525,45 @@ class PostgresTableEvidenceRepository(
         # --------------------------------------------
         # Authorization is applied INSIDE the query.
         #
-        # Re-check current DocumentPermission as well
-        # as the already-computed scope so stale
-        # scopes cannot disclose table structure.
+        # Every scope is constrained to its authorized
+        # document IDs and ACTIVE documents.
+        #
+        # ACL-backed scopes additionally re-check the
+        # current DocumentPermission so stale or
+        # poisoned scopes cannot disclose structure.
+        #
+        # ADMIN scopes are produced from the current
+        # active-document set and therefore do not
+        # require per-document ACL rows.
         # --------------------------------------------
 
-        rows = tuple(
-            self._db.execute(
-                select(
+        statement = (
+            select(
+                TableEvidenceRecord
+                .section_key,
+                TableEvidenceRecord
+                .logical_key,
+                TableEvidenceRecord
+                .column_names_json,
+                TableEvidenceRecord
+                .cells_json,
+            )
+            .join(
+                Document,
+                Document.id
+                == (
                     TableEvidenceRecord
-                    .section_key,
-                    TableEvidenceRecord
-                    .logical_key,
-                    TableEvidenceRecord
-                    .column_names_json,
-                    TableEvidenceRecord
-                    .cells_json,
-                )
-                .join(
-                    Document,
-                    Document.id
-                    == (
-                        TableEvidenceRecord
-                        .document_id
-                    ),
-                )
+                    .document_id
+                ),
+            )
+        )
+
+        if (
+            scope
+            .requires_document_permission
+        ):
+            statement = (
+                statement
                 .join(
                     DocumentPermission,
                     DocumentPermission
@@ -560,19 +574,27 @@ class PostgresTableEvidenceRepository(
                     ),
                 )
                 .where(
-                    TableEvidenceRecord
-                    .document_id.in_(
-                        scope.document_ids
-                    ),
                     DocumentPermission
                     .user_id
                     == scope.user_id,
                     DocumentPermission
                     .action
                     == scope.action.value,
-                    Document.status
-                    == "ACTIVE",
                 )
+            )
+
+        statement = statement.where(
+            TableEvidenceRecord
+            .document_id.in_(
+                scope.document_ids
+            ),
+            Document.status
+            == "ACTIVE",
+        )
+
+        rows = tuple(
+            self._db.execute(
+                statement
             )
             .all()
         )

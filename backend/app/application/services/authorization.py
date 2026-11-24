@@ -35,7 +35,11 @@ class AuthorizationService:
         self,
         identity: CurrentIdentity,
     ) -> AuthorizationScope:
-        if self._is_admin(identity):
+        is_admin = self._is_admin(
+            identity
+        )
+
+        if is_admin:
             document_ids = (
                 self._repository.active_document_ids()
             )
@@ -52,6 +56,9 @@ class AuthorizationService:
             user_id=identity.user_id,
             action=PermissionAction.READ,
             document_ids=document_ids,
+            requires_document_permission=(
+                not is_admin
+            ),
         )
 
     def require_document_read(

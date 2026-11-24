@@ -15,6 +15,7 @@ class AuthorizationScope:
     user_id: UUID
     action: PermissionAction
     document_ids: frozenset[UUID]
+    requires_document_permission: bool = True
 
     def allows(
         self,

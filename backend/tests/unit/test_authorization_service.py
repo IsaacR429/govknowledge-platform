@@ -246,3 +246,89 @@ def test_archived_document_with_stale_read_permission_is_denied():
             identity,
             archived_document,
         )
+
+
+def test_scope_permission_recheck_semantics():
+    employee_document = uuid4()
+    admin_document = uuid4()
+
+    repository = FakeAuthorizationRepository(
+        {
+            employee_document,
+        },
+        active_document_ids={
+            employee_document,
+            admin_document,
+        },
+    )
+
+    service = AuthorizationService(
+        repository
+    )
+
+    employee_scope = (
+        service.retrieval_scope(
+            make_identity(
+                roles=("EMPLOYEE",)
+            )
+        )
+    )
+
+    admin_scope = (
+        service.retrieval_scope(
+            make_identity(
+                roles=("ADMIN",)
+            )
+        )
+    )
+
+    assert (
+        employee_scope
+        .requires_document_permission
+        is True
+    )
+
+    assert (
+        admin_scope
+        .requires_document_permission
+        is False
+    )
+
+    assert (
+        employee_scope.document_ids
+        == frozenset(
+            {
+                employee_document,
+            }
+        )
+    )
+
+    assert (
+        admin_scope.document_ids
+        == frozenset(
+            {
+                employee_document,
+                admin_document,
+            }
+        )
+    )
+
+
+def test_manual_scope_defaults_to_permission_recheck():
+    document_id = uuid4()
+
+    scope = AuthorizationScope(
+        user_id=uuid4(),
+        action=PermissionAction.READ,
+        document_ids=frozenset(
+            {
+                document_id,
+            }
+        ),
+    )
+
+    assert (
+        scope
+        .requires_document_permission
+        is True
+    )
